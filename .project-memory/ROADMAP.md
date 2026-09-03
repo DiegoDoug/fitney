@@ -8,7 +8,7 @@
 - **Phase 9 — Quality engineering** — Phase — Planned — ? → ?
 - **Phase 7 — Security and identity** — Phase — Approved — ? → ?
 - **Phase 1 — Product strategy** — Phase — Approved — ? → ?
-- **Phase 5 — Client engineering** — Phase — Ready for Review — ? → ?
+- **Phase 5 — Client engineering** — Phase — Active — ? → ?
 - **Phase 2 — UX product design (evidence-based-ui-ux)** — Phase — Approved — ? → ?
 - **Phase 4 — Software architecture** — Phase — Approved — ? → ?
 - **Phase 3 — Visual UI design** — Phase — Approved — ? → ?
