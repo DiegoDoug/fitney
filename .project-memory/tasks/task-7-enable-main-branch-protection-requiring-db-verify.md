@@ -5,8 +5,8 @@ title: "Enable main branch protection requiring db-verify"
 notion_page_id: "3d0e6070-43bc-81fd-914c-f10e97084cbf"
 notion_url: "https://app.notion.com/p/Enable-main-branch-protection-requiring-db-verify-3d0e607043bc81fd914cf10e97084cbf"
 created: "2026-09-03T04:49:00.000Z"
-last_edited: "2026-09-03T04:49:00.000Z"
-status: "Ready"
+last_edited: "2026-09-03T17:02:00.000Z"
+status: "Done"
 ---
 
 # Enable main branch protection requiring db-verify
@@ -30,3 +30,7 @@ main cannot merge changes unless the db-verify workflow passes; protection is co
 ## Verification
 
 Not Run
+
+## Commit / PR
+
+https://github.com/DiegoDoug/fitney (Protect Main ruleset id 22205300) + verification in https://github.com/DiegoDoug/fitney/pull/1

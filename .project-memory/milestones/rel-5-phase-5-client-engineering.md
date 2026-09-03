@@ -5,8 +5,8 @@ title: "Phase 5 — Client engineering"
 notion_page_id: "3cfe6070-43bc-81a4-bfc2-ec34403fd318"
 notion_url: "https://app.notion.com/p/Phase-5-Client-engineering-3cfe607043bc81a4bfc2ec34403fd318"
 created: "2026-09-02T20:15:00.000Z"
-last_edited: "2026-09-03T15:00:00.000Z"
-status: "Planned"
+last_edited: "2026-09-03T17:03:00.000Z"
+status: "Ready for Review"
 ---
 
 # Phase 5 — Client engineering
@@ -22,3 +22,7 @@ Phase
 ## Exit Criteria
 
 UNLOCKED 2026-09-03 by human approval of the dev-only gate. DEP-1 development execution and Phase 7 verification are satisfied. Phase 5 has not started; it requires explicit execution authorization. Build the offline logging vertical slice first. WORK-020 client TypeScript ↔ server SQL golden-vector parity is an acceptance condition before Phase 5 approval, not a start prerequisite. Production infrastructure remains deferred.
+
+## GitHub Ref
+
+https://github.com/DiegoDoug/fitney/pull/1

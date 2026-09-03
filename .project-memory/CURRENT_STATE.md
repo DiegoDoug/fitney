@@ -2,7 +2,7 @@
 notion_page_id: "3cfe6070-43bc-8046-b281-eb56b92335af"
 notion_url: "https://app.notion.com/p/Fitney-3cfe607043bc8046b281eb56b92335af"
 last_edited: "2026-09-03T15:00:00.000Z"
-generated_at: "2026-09-03T16:00:29.271Z"
+generated_at: "2026-09-03T17:03:44.636Z"
 ---
 
 # Current State
@@ -36,7 +36,6 @@ Phase 5 Client Engineering is UNLOCKED but NOT STARTED after human approval of t
 
 ## Active Implementation
 
-- Enable main branch protection requiring db-verify — Ready — Human
 - Backend data layer — schema, migrations, sync_apply RPC, recompute, RLS baseline, delete-account, pgTAP — Review — Claude Code
 - Validate corrected weekly-aggregate bucketing (week_start + session-local date) vs golden vectors — Ready — Claude Code
 - Hosted auth hardening + secret provisioning + Edge Function dependency pin — Backlog — Human
@@ -44,6 +43,7 @@ Phase 5 Client Engineering is UNLOCKED but NOT STARTED after human approval of t
 
 ## Reviews Requiring Attention
 
+- Phase 5 — Client engineering: Foundation gate + offline-logging logic layers — Pass with Conditions
 - Phase 8 — Platform & Release human approval (dev-only gate) — Pass with Conditions
 - Phase 7 — Security & Identity human approval after hosted verification — Pass with Conditions
 - Phase 8 — Platform & Release execution — Pass with Conditions
