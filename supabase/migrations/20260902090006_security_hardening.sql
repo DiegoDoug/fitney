@@ -460,3 +460,38 @@ begin
   return coalesce(new, old);
 end;
 $$;
+
+-- =====================================================================
+-- F-13 · Internal / trigger / SECURITY DEFINER functions must NOT be
+-- callable via the PostgREST RPC surface.
+-- =====================================================================
+-- Supabase's ALTER DEFAULT PRIVILEGES grants EXECUTE on every new function to
+-- `anon` and `authenticated`; `REVOKE ... FROM public` (used above) does not
+-- remove a role-specific grant. Without this block the Supabase security
+-- advisor flags recompute_* and the trigger functions as
+-- "Public/Signed-In Users Can Execute SECURITY DEFINER Function"
+-- (`/rest/v1/rpc/<name>`) — a caller could invoke recompute_*(<any user_id>, …)
+-- for an arbitrary user. These are invoked only by the AFTER triggers; no client
+-- role needs EXECUTE. (sync_apply keeps its explicit grant to `authenticated`.)
+do $$
+declare fn text;
+begin
+  foreach fn in array array[
+    'set_row_metadata()',
+    '_attach_row_metadata(regclass)',
+    '_epley_e1rm(numeric, integer)',
+    '_pr_id(uuid, uuid, text, integer)',
+    '_agg_id(text, uuid, text)',
+    '_week_start_for(date, smallint)',
+    'recompute_exercise_prs(uuid, uuid)',
+    'recompute_session_volume_pr(uuid)',
+    'recompute_week_aggregates(uuid, date)',
+    'trg_recompute_from_performed_set()',
+    'trg_recompute_from_session()',
+    '_check_ref_ownership()',
+    '_guard_exercise_owner()'
+  ]
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', fn);
+  end loop;
+end $$;

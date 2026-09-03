@@ -13,10 +13,14 @@
 project_id = "weight"
 
 [db]
-# Postgres major version. Pinned to 15 to match the architecture / backend
-# implementation contract (BD-DEC-01). Changing this is a backend-data-engineering
-# decision, not platform-release.
-major_version = 15
+# Postgres major version. The architecture / backend contract (BD-DEC-01) assumed
+# 15, but Supabase no longer provisions 15 for new projects — the hosted
+# `fitney-dev` project (2026-09-03) and therefore the linked local stack are
+# BOTH Postgres 17. All migrations + the 4 pgTAP suites pass on 17 (local + hosted
+# + CI). Aligned to 17 here; the BD-DEC-01 "PG15" assumption is a recorded
+# deviation routed to `backend-data-engineering` to ratify (nothing in the schema
+# is version-specific).
+major_version = 17
 
 [db.migrations]
 # Default migration path (supabase/migrations). Forward-only (ADR-0006).

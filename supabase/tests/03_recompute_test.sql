@@ -30,10 +30,10 @@ insert into performed_sets (id, user_id, session_exercise_id, position, set_type
   ('d3000000-0000-4000-8000-000000000004','d0000000-0000-4000-8000-00000000000d','d2000000-0000-4000-8000-000000000002',1,'working',102.5,8,true,'2026-08-31T10:20:00Z'),
   ('d3000000-0000-4000-8000-000000000005','d0000000-0000-4000-8000-00000000000d','d2000000-0000-4000-8000-000000000002',2,'working',110  ,1,true,'2026-08-31T10:30:00Z');
 
--- triggers should have fired on insert; force an explicit recompute too (idempotent)
-select recompute_exercise_prs('d0000000-0000-4000-8000-00000000000d','11111111-0000-4000-8000-000000000001');
-select recompute_session_volume_pr('d0000000-0000-4000-8000-00000000000d');
-select recompute_week_aggregates('d0000000-0000-4000-8000-00000000000d', date '2026-08-31');
+-- The AFTER triggers on performed_sets fired on the inserts above and populated
+-- personal_records / weekly_aggregates. F-13: recompute_* is NOT client-callable
+-- (revoked from anon/authenticated) — it runs only inside the SECURITY DEFINER
+-- triggers — so this suite verifies the trigger-driven results, not a direct call.
 
 -- F-12: personal_records.value / weekly_aggregates.total_volume_kg are numeric; pgTAP is()
 -- needs both sides the same type, so expected integers are cast ::numeric.
@@ -61,11 +61,13 @@ select is( (select value from personal_records where category='session_volume'),
 select is( (select total_volume_kg from weekly_aggregates where week_start_date = date_trunc('week', date '2026-08-31')::date),
            1430::numeric, 'weekly working volume = 1430' );
 
--- idempotency: recompute again, values unchanged
-select recompute_exercise_prs('d0000000-0000-4000-8000-00000000000d','11111111-0000-4000-8000-000000000001');
+-- idempotency: a no-op UPDATE on a performed_set fires the recompute trigger AGAIN;
+-- the materialised values must be unchanged.
+update performed_sets set reps = reps
+  where id = 'd3000000-0000-4000-8000-000000000005';
 select is( (select value from personal_records where category='max_load'
             and exercise_id='11111111-0000-4000-8000-000000000001'),
-           110::numeric, 'recompute is idempotent' );
+           110::numeric, 'recompute is idempotent (re-fires trigger, values stable)' );
 
 select * from finish();
 rollback;

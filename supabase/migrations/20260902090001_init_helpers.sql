@@ -18,6 +18,7 @@ create extension if not exists "uuid-ossp";   -- uuid_generate_v5() for determin
 create or replace function set_row_metadata()
 returns trigger
 language plpgsql
+set search_path = pg_catalog, public   -- F-14: pin the search_path on this hot trigger function
 as $$
 begin
   if (tg_op = 'INSERT') then
@@ -38,6 +39,7 @@ $$;
 create or replace function _attach_row_metadata(p_table regclass)
 returns void
 language plpgsql
+set search_path = pg_catalog, public   -- F-14: pin the search_path (advisor 0011)
 as $$
 begin
   execute format(

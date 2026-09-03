@@ -6,3 +6,6 @@ dist/
 # seed.sql, config.toml, or functions/**/deno.lock — those are tracked).
 supabase/.branches/
 supabase/.temp/
+
+# ad-hoc hosted-verification scratch copies (never committed)
+.hosted-test-run/
