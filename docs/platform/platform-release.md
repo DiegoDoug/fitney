@@ -223,20 +223,43 @@ All twelve were fixed **in place** (migrations unshipped) by `security-identity`
 
 See §10, **§10.1**, and [`docs/platform/evidence/`](evidence/). After WORK-022: `supabase db reset` ×2 pass; `supabase db lint` clean at **warning and error**; `supabase test db` = **PASS 68/68** (every suite reaches `finish()` with an exact plan); runtime probes confirm the F‑5 recompute path, `week_start` 0–6 bucketing, and `sync_apply` full/replay/partial/anon behaviour. The Edge Function type-checks against its pinned lock (`deno check`). Evidence files scanned — no secrets.
 
+## 10.2 Hosted `fitney-dev` + CI verification (2026-09-03)
+
+Human recorded "APPROVED — dev-only gate": git init + GitHub repo + **one** hosted `fitney-dev` Supabase project authorised; production deferred. Full evidence: [`docs/platform/evidence/10-hosted-fitney-dev-verification.md`](evidence/10-hosted-fitney-dev-verification.md).
+
+- **Git:** `git init` → initial commit → `gh repo create fitney --private` → pushed to `github.com/DiegoDoug/fitney`. `.env` confirmed git-ignored and never committed.
+- **`db-verify` CI:** green on `main` — `supabase db start` → `db reset --local` → `db lint --local --fail-on error` (clean) → `supabase test db` → **`01/02/03/04 ok`, Result: PASS, Tests=68**.
+- **`fitney-dev`:** ref `oaubwbvoaydveguqjovq`, MetaTrack org (`get_cost` → **$0/month**, `confirm_cost` recorded), region `us-east-1`, **Postgres 17.6.1**.
+- `supabase link` → `supabase db push` → 6 migrations applied clean. `supabase db reset --linked` (after ISS-27/F-13/F-14) re-applied the whole chain + seed clean. `list_migrations` = `…01`…`…06`.
+- `supabase db lint --linked` → **No schema errors found**.
+- **Supabase security advisor** (`get_advisors security`): after F-13/F-14, **one finding, INFO, by design** — `deletion_receipts` RLS-enabled-no-policy (SEC-DEC-04: `FORCE` RLS + zero policies = service-role-only). The pre-fix run had 19 WARNs → F-13 (`recompute_*`/trigger/definer fns RPC-executable by `anon`+`authenticated`) + F-14 (`set_row_metadata`/`_attach_row_metadata` mutable `search_path`).
+- **31 hosted behavioural checks** (two `begin…rollback` probe batches as the real `authenticated`/`anon`/`service_role` roles with GoTrue-style claims) = **31 passed / 0 failed**: `sync_apply` full→`applied` / replay→`duplicate` / partial→`rejected` (no row, no raw exception) / stale→`conflict` / update→v2 / tombstone; trigger recompute (F-5/F-9) + exact golden vectors + idempotency; tenant isolation (B sees 0 of A; UPDATE/DELETE→0 rows; forged `user_id`→42501; cross-tenant composite FK→23503; B cannot write `personal_records`→42501); `service_role` **BYPASSRLS**; **ISS-27** anon sees 0 exercises; **F-11/F-13** `anon` + `authenticated` cannot `EXECUTE` `sync_apply` / `recompute_*` while the triggers still populate the derived tables.
+- **`supabase test db --linked` not usable:** its temporary restricted test role can't `INSERT INTO auth.users` (needed to mint test users) and pgtap installs to `extensions` (off that role's `search_path`). The suites are proven on the local stack + CI; hosted behaviour is proven by the probes above.
+
+## 13a. Additional findings (hosted run) — fixed under WORK-022
+
+| ID | Sev | Finding | Fix |
+|---|---|---|---|
+| **F‑13** | Med | Supabase advisor: `recompute_exercise_prs` / `recompute_session_volume_pr` / `recompute_week_aggregates`, `trg_recompute_from_*`, `_check_ref_ownership`, `_guard_exercise_owner` — all `SECURITY DEFINER` in `public`, all **RPC-executable by `anon` + `authenticated`** (`/rest/v1/rpc/<name>`), so a caller could invoke `recompute_*(<any user_id>, …)`. Same `ALTER DEFAULT PRIVILEGES` gap as F‑11; `REVOKE … FROM public` doesn't remove role grants. | `20260902090006`: `revoke all on function … from public, anon, authenticated` on all 13 internal functions. Triggers still fire (invocation doesn't check `EXECUTE`); `tests/03` now verifies the trigger-driven results + idempotency instead of a direct call. Advisor re-run → clear. |
+| **F‑14** | Low | Advisor 0011: `set_row_metadata` (hot BEFORE trigger) and `_attach_row_metadata` have a mutable `search_path`. | `20260902090001`: `set search_path = pg_catalog, public` on both. |
+| **ISS‑27** | Low | `exercise_select` let `anon` read the seed catalogue. **Human decision 2026-09-03: authenticated-only.** | `20260902090006`: `exercise_select` → `TO authenticated`. Refines the read half of SEC-DEC-05. Hosted-verified: anon sees 0 exercises; authenticated reads the 8 seed rows. |
+| **PG15→PG17** | Deviation | BD-DEC-01 assumed Postgres 15; Supabase provisions **17** for new projects → `fitney-dev` + linked local stack + CI are all PG17. Nothing in the schema is version-specific; 68/68 + all probes pass on 17. | `config.toml` `major_version` 15→17. Routed to `backend-data-engineering` to ratify — **ISS‑28**. |
+
 ## 17. Status
 
 **PASS WITH CONDITIONS.**
 
-Platform deliverables are complete and verified where authorized: a working local Supabase environment on the target Postgres 15, a repeatable fresh-create migration chain, a clean schema lint (warning + error), a DB-verification CI gate, resolved SEC‑RESID‑2 dependency pinning, environment/secret separation, and captured command evidence. First-ever local execution of the authored data/security layer surfaced **twelve defects** (two High: F‑5, F‑9; the rest Medium/Low) that inspection-only review missed — exactly what the DEP‑1 execution gate exists to catch. Under the human-authorised **WORK-022** recovery, `security-identity` + `backend-data-engineering` fixed all twelve in place (migrations unshipped); the suite now **passes 68/68 locally**.
+The platform gate is met on all three surfaces: a repeatable fresh-create migration chain, a clean schema lint (warning + error), and a green pgTAP suite (68/68) **locally**, **in CI** (`db-verify` on `main`), **and** — via `db push` / `db reset --linked` / `db lint --linked` / the Supabase security advisor / 31 behavioural probes — on the **hosted `fitney-dev`** project (Postgres 17, real Supabase role model). Execution across the phase surfaced **fifteen defects** (F‑1…F‑14 + the ISS‑27 tightening); all were fixed in place under the human-authorised **WORK‑022** recovery while the migrations were unshipped. `git` is initialised and pushed; SEC‑RESID‑2 is resolved; environment/secret separation holds and no key is committed.
 
 Conditions:
-- **C‑1:** `git init` + GitHub repository required for the `db-verify` CI gate to actually run and for branch protection (human action).
-- **C‑2:** hosted DEP‑1 (development + production Supabase projects) requires a human decision (org + authorization); all hosted provisioning, hosted auth hardening, secret provisioning, Edge Function deploy, and PITR/retention config are deferred to it.
-- **C‑3:** the pgTAP + lint gate now **passes locally**, but on `postgres`-as-owner, not the real hosted role model. **Phases 6 and 7 stay NOT approved** (DEC‑3: zero *hosted*-executed tests). The suites must re-run green on a provisioned Supabase project **and** the `db-verify` CI gate must be green before `client-engineering` unlocks.
-- **C‑4:** the F‑1 `perform`→`select` correction and the F‑3/F‑4/F‑6/F‑10/F‑12 test edits were made under WORK-022; `security-identity` / `backend-data-engineering` own the files and should confirm the edits at approval.
-- **C‑5:** Edge Function dependency pinned to `2.112.4` (not latest) pending supply-chain min-age; hosted `deno.lock` reproducibility to be confirmed on first deploy.
-- **C‑6 (open question):** **ISS‑27** — whether the anon key should expose the global seed-exercise catalogue (`exercise_select` currently permits it, per SEC-DEC-05). Not blocking; decide before beta.
+- **C‑1 (residual):** the `db-verify` check is green but **not yet a required status check** — a human should enable branch protection on `main` requiring it (GitHub UI).
+- **C‑2 (deferred, human):** the **production** Supabase project, hosted auth hardening (SEC‑C2: email confirmation / leaked-password / rate limits), `supabase secrets set` (service-role + `DELETION_RECEIPT_HMAC_KEY`), `supabase functions deploy delete-account`, and PITR/retention (SEC‑OQ‑1) are all still outstanding.
+- **C‑3:** phases 6 and 7 approval, and the `client-engineering` unlock, require an explicit **human approval of this phase** (DEC‑3). The execution evidence gate is now satisfied (hosted + CI green).
+- **C‑4:** the WORK‑022 migration edits (`0001` F‑14, `0003` F‑7/F‑9, `0006` F‑2/F‑5/F‑8/F‑11/F‑13/ISS‑27) and pgTAP edits are in files owned by `security-identity` / `backend-data-engineering`; confirm at approval.
+- **C‑5:** Edge Function pinned to `@supabase/supabase-js@2.112.4` (not latest); hosted `deno.lock` reproducibility to confirm on first `functions deploy`.
+- **C‑6:** **ISS‑28** — hosted + local + CI are Postgres 17, not the PG15 of BD‑DEC‑01. `backend-data-engineering` to ratify (schema is version-agnostic; everything passes on 17).
+- **ISS‑27:** RESOLVED — authenticated-only catalogue, implemented and hosted-verified.
 
 ### Next human decision
 
-Review this artifact + `security-identity.md` §8.1 + `backend-data-implementation.md` §9.1. Then record `APPROVED — proceed to <next>` (accepting C‑1…C‑6), `APPROVED WITH CONDITIONS`, or request revisions. The lifecycle does not advance and `client-engineering` stays `LOCKED` until an explicit human approval is recorded, DEP‑1 is provisioned, and the pgTAP + CI gate is green on the hosted project.
+Review this artifact + `security-identity.md` §8.1–8.2 + `backend-data-implementation.md` §9.1. Then record `APPROVED — proceed to <next>` (accepting C‑1…C‑6), `APPROVED WITH CONDITIONS`, or request revisions. `client-engineering` stays `LOCKED` until phase 8 and phase 7 are human-approved.

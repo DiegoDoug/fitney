@@ -187,13 +187,44 @@ None beyond Supabase (Auth, PostgREST, one Edge Function) and the analytics inte
 | Recompute golden vectors (`tests/03` + runtime probe) | ✅ Epley e1RM 116.6667 & 129.8333, `max_load` 110, `session_volume` 1430, `weekly` 1430, `rep_pr` {1:110, 8:102.5}; idempotent on re-run; correct `week_start`-relative bucketing for `week_start` 0–6 |
 | `sync_apply` (runtime probe) | ✅ full → `applied`; replay → `duplicate`; partial → `rejected` (no row, no exception); `anon` → `permission denied` |
 
-**Still outstanding — HOSTED:** re-run the same on a provisioned Supabase project (real `service_role` BYPASSRLS, GoTrue `auth.uid()`/`auth.role()`), wire the CI gate, and formally cross-validate the recompute golden vectors against the WORK-012 client TS implementation. **BD-C1 is met locally; the hosted run + CI gate remain required before `client-engineering`.**
+### 9.2 Hosted `fitney-dev` + CI (2026-09-03)
+
+`platform-release` provisioned the hosted **dev** project (`fitney-dev`, ref
+`oaubwbvoaydveguqjovq`, **Postgres 17**, $0/mo) and pushed the chain. Backend-owned
+outcomes:
+
+- `supabase db push` / `db reset --linked` → `0001`–`0006` + seed applied clean on
+  PG17; `db lint --linked` clean.
+- **Two more defects** from the Supabase security advisor, fixed under WORK-022:
+  **F‑13** — `recompute_*` and the recompute trigger functions were RPC-executable by
+  `anon` + `authenticated` (same `ALTER DEFAULT PRIVILEGES` gap as F‑11) →
+  `20260902090006` `revoke all … from public, anon, authenticated` on all 13 internal
+  functions; the AFTER triggers still fire. **F‑14** — `set_row_metadata` /
+  `_attach_row_metadata` mutable `search_path` → pinned in `20260902090001`.
+  `tests/03` now proves the trigger-driven recompute + idempotency (no direct
+  `recompute_*` call, which is now correctly forbidden to clients).
+- **Recompute on hosted PG17:** trigger fires on a completed-session `performed_sets`
+  write with no error; golden vectors exact (`max_load` 110, Epley e1RM 129.8333,
+  `session_volume` 1430, weekly working volume 1430); idempotent.
+- **`config.toml` `major_version` 15 → 17.** Supabase no longer provisions PG15;
+  `fitney-dev` + the linked local stack + CI are all PG17. Nothing in the schema is
+  version-specific; the full chain + 68/68 pgTAP + 31 hosted probes pass on 17.
+  **BD‑DEC‑01's PG15 assumption is a recorded deviation — `backend-data-engineering`
+  to ratify (ISS‑28).**
+- `db-verify` CI green on `main` (68/68).
+
+Evidence: [`docs/platform/evidence/09`, `10`](../platform/evidence/).
+
+**Still owed:** the byte-for-byte client-TS ↔ server recompute golden-vector cross-run
+(WORK‑020) — the client `domain/{calc,pr}` implementation does not exist yet, so per
+the human (2026‑09‑03) this becomes a **`client-engineering` acceptance condition**,
+not a phase-8/BD blocker. **BD‑C1 execution gate: satisfied (local + hosted-dev + CI).**
 
 ## 10. Data risks
 
 | ID | Risk | Mitigation | Owner |
 |---|---|---|---|
-| BD-RISK-1 | Migrations / functions authored but never executed. | **LOCAL RUN DONE 2026-09-02 (§9.1):** first execution found F-2/F-5/F-7/F-8/F-9/F-11 (+ test defects F-1/F-3/F-4/F-6/F-10/F-12); all fixed under WORK-022; `db reset` + `db lint` + `supabase test db` (68/68) + runtime probes now green on Postgres 15.8. **Residual:** the hosted role model (`service_role` BYPASSRLS, GoTrue) is still unverified; re-run on DEP-1 + CI-gate before client integration. | `backend-data-engineering`, `quality-engineering`, `platform-release` |
+| BD-RISK-1 | Migrations / functions authored but never executed. | **CLOSED 2026-09-03.** Execution across phase 8 found **15 defects** (F-1…F-14 + ISS-27); all fixed under WORK-022 while migrations were unshipped. Now green: LOCAL (`db reset` + `db lint` + `supabase test db` 68/68), CI (`db-verify` on `main`), and HOSTED `fitney-dev` PG17 (`db push`/`db reset --linked`/`db lint --linked` clean; Supabase advisor clean bar 1 intentional INFO; 31 behavioural checks on real `authenticated`/`anon`/`service_role` = 31/0). | `backend-data-engineering`, `quality-engineering`, `platform-release` |
 | BD-RISK-2 | `recompute_week_aggregates` buckets by `date_trunc('week', started_at at UTC)` (Mon-based), but the product supports a configurable `week_start` (SET-01). Weekly aggregates may not match the user's chosen week boundary. | Resolve: either bucket by the user's `week_start` in the recompute (pass it in), or compute week boundaries only client-side and treat `weekly_aggregates` as UTC-ISO-week rollups the client re-buckets. Routed as **BD-OQ-1**. | `backend-data-engineering` + `client-engineering` |
 | BD-RISK-3 | Trigger-driven recompute on every `performed_sets` write could become hot if a future feature bulk-imports sessions. | AR-A2 bounds it for MVP; if bulk import lands, switch those paths to a deferred `recompute` queue. | `backend-data-engineering` |
 | BD-RISK-4 | The recompute triggers must run with rights to write `personal_records`/`weekly_aggregates`/`exercise_weekly_rollups` while those tables have FORCE RLS and no write policy. The exact grant/definer model needs confirming on the provisioned project. | Marked inline in `20260902090005_rls.sql`; routed to `security-identity` to finalise (likely `SECURITY DEFINER` on the recompute functions owned by a dedicated role, or a `service_role`-only write policy). **BD-OQ-2**. | `security-identity`, `backend-data-engineering` |

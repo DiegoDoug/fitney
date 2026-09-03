@@ -163,7 +163,47 @@ Severity: how exploitable × impact on tenant isolation / privacy / availability
 | Runtime probe — `_week_start_for` for `week_start` 0–6 | ✅ correct week-start for every configured first day |
 | Runtime probe — `sync_apply` full payload / replay / partial / anon | ✅ `applied` / `duplicate` / `rejected` (no raw exception, no row) / `permission denied` |
 
-**Still `[U]` (hosted):** the same suites on a provisioned Supabase project against the real hosted role model (BYPASSRLS on `service_role`, GoTrue `auth.uid()`/`auth.role()`), and hosted auth hardening. Local `postgres`-as-owner `SECURITY DEFINER` behaviour matched expectations; hosted must confirm.
+### 8.2 Hosted verification on `fitney-dev` (2026-09-03) — `[V]`
+
+The human authorised git + one hosted **dev** Supabase project. `fitney-dev`
+(ref `oaubwbvoaydveguqjovq`, MetaTrack org, **Postgres 17**, $0/mo): `supabase db
+push` / `db reset --linked` applied `0001`–`0006` + seed cleanly; `db lint --linked`
+clean. Two more defects surfaced only against the real Supabase role model +
+PostgREST and were fixed under WORK-022:
+
+| ID | Sev | Finding | Fix |
+|---|---|---|---|
+| **F‑13** | Med | Supabase security advisor: `recompute_exercise_prs` / `recompute_session_volume_pr` / `recompute_week_aggregates`, `trg_recompute_from_performed_set` / `trg_recompute_from_session`, `_check_ref_ownership`, `_guard_exercise_owner` are `SECURITY DEFINER` in `public` and **executable by `anon` + `authenticated`** via `/rest/v1/rpc/<name>` — a caller could invoke `recompute_*(<any user_id>, …)`. Same Supabase `ALTER DEFAULT PRIVILEGES` gap as F‑11 (`REVOKE … FROM public` leaves role grants). | `20260902090006`: `revoke all on function … from public, anon, authenticated` on all 13 internal / helper / trigger / definer functions. AFTER triggers still fire (invocation does not check `EXECUTE`); `sync_apply` keeps its explicit `authenticated` grant. Advisor re-run → clear. |
+| **F‑14** | Low | Advisor 0011: `set_row_metadata` (hot BEFORE trigger) + `_attach_row_metadata` have a mutable `search_path`. | `20260902090001`: `set search_path = pg_catalog, public` on both. |
+
+**Supabase security advisor after the fixes:** one finding, **INFO**, **by design** —
+`public.deletion_receipts` "RLS enabled, no policy" (SEC-REQ-DATA-02: `FORCE` RLS +
+zero policies ⇒ `service_role`-only). Accepted.
+
+**Hosted behavioural verification** — 31 checks as the real `authenticated` / `anon` /
+`service_role` roles, inside `begin … rollback`, **31/0**:
+
+- cross-account read/write denial (SELECT 0 rows; UPDATE/DELETE 0 rows; forged
+  `user_id` → `42501`); child → other-tenant parent via composite `(id,user_id)` FK →
+  `23503`; `personal_records` client write → `42501`.
+- `sync_apply`: full → `applied`; replay → `duplicate` (F‑8); partial → `rejected`
+  with no row / no raw exception (F‑2); stale `base_version` → `conflict`.
+- recompute trigger runs on a completed-session write with **no `_week_start_for`
+  (F‑5) / no `uuid_ns_url` (F‑9) error**; golden vectors exact; idempotent.
+- **`service_role` BYPASSRLS confirmed** (sees rows across owners) — the behaviour the
+  local `postgres`-as-owner run could not exercise.
+- **ISS‑27:** `anon` sees **0** exercises; **F‑11 / F‑13:** `anon` and `authenticated`
+  cannot `EXECUTE` `sync_apply` / `recompute_*` → `42501`.
+
+`db-verify` CI (local flow on a GitHub runner) is **green on `main`** — 68/68.
+
+Evidence: [`docs/platform/evidence/09`, `10`](../platform/evidence/).
+
+**Still `[U]`:** the pgTAP suites *themselves* on hosted (`supabase test db --linked`
+can't `INSERT INTO auth.users` from its restricted test role — suites proven on
+local + CI); **production** project; hosted auth hardening (SEC‑C2). Deviation:
+hosted + local + CI are Postgres 17, not the PG15 of BD‑DEC‑01 — **ISS‑28**
+(routed to `backend-data-engineering`; schema is version-agnostic, all green on 17).
 
 ## 9. Residual risks
 
@@ -177,7 +217,8 @@ Severity: how exploitable × impact on tenant isolation / privacy / availability
 | **SEC-RESID-6** | No external penetration test of the deployed API. | Human | Recommended before beta; needs authorization + a staging env. |
 | **SEC-RESID-7** | Trigger-heavy write path (`set_row_metadata` + `_check_ref_ownership` + `_guard_exercise_owner` + recompute triggers) — a bug in any BEFORE trigger blocks legitimate writes. High test surface. | `quality-engineering` | Covered by `tests/01`–`04` + WORK-013; must be green on DEP-1. |
 | **SEC-RESID-8** | Weekly-aggregate correctness fix (SEC-F-9) was implemented outside this phase's decision ownership; WORK-022 additionally corrected an `smallint`/`integer` resolution bug in it (F-5) and probed `week_start` 0–6 + the `tests/03` golden vectors (1430 weekly volume, e1RM 116.6667/129.8333) — all green locally. | `backend-data-engineering` | Backend to formally review + cross-validate vs the WORK-012 client TS golden vectors before Data & Progress. |
-| **SEC-RESID-9** | `exercise_select` RLS lets an **anon** session read the global seed catalogue (consistent with SEC-DEC-05, but the app has no anon flow). **ISS-27** — open question / candidate tightening (`exercise_select TO authenticated`). | `security-identity` | Track; not blocking (public fitness data; no anon path in the client). Decide before beta. |
+| **SEC-RESID-9** | **RESOLVED 2026-09-03 (ISS-27).** Human decision: exercise catalogue is authenticated-only. `20260902090006` now creates `exercise_select` `TO authenticated`; hosted-verified (`anon` → 0 exercises; `authenticated` → the 8 seed rows). Refines the read half of SEC-DEC-05. | `security-identity` | Closed. |
+| **SEC-RESID-10** | Hosted + local + CI run **Postgres 17** (Supabase no longer provisions 15) vs BD-DEC-01's PG15 assumption. All migrations + the 4 pgTAP suites + 31 hosted probes pass on 17; nothing in the schema is version-specific. **ISS-28** — routed to `backend-data-engineering` to ratify. | `backend-data-engineering` | Track; not blocking. |
 
 ## 10. Requirement traceability
 
@@ -212,7 +253,7 @@ The security model is defined end-to-end: trust boundaries and a threat catalogu
 
 Conditions:
 
-- **SEC-C1 (inherits BD-C1):** **LOCAL execution now PASSES.** `platform-release` provisioned a local Postgres 15.8 stack; WORK-022 remediated ten defects surfaced by first execution (F-1…F-12, §8.1); `supabase db reset` ×2 + `supabase db lint` (clean) + `supabase test db` = **PASS 68/68**, plus targeted runtime probes. **HOSTED execution is still outstanding** — the same must be re-run on a provisioned Supabase project (real `service_role` BYPASSRLS, GoTrue) and CI-gated. `client-engineering` stays `LOCKED` until the hosted run is green and this phase is approved (SEC-RESID-3, release condition 1).
+- **SEC-C1 (inherits BD-C1):** **EXECUTION GATE SATISFIED.** LOCAL: `db reset` ×2 + `db lint` (clean) + `supabase test db` = PASS 68/68 (§8.1). CI: `db-verify` green on `main` (68/68). HOSTED (`fitney-dev`, PG17): migrations + `db lint --linked` clean; Supabase security advisor clean bar one intentional INFO; 31 behavioural checks on the real `authenticated`/`anon`/`service_role` roles = 31/0 (§8.2). Fifteen defects (F-1…F-14 + ISS-27) fixed under WORK-022 while migrations were unshipped. **`client-engineering` still `LOCKED`** — pending human approval of phases 7 and 8 (not pending more execution evidence).
 - **SEC-C2:** Hosted auth configuration (SEC-REQ-AUTH-02/03/05) and secret provisioning (SEC-REQ-SEC-01/02) + the Edge Function dependency pin (SEC-RESID-2) are routed to `platform-release` and are hard gates for any non-dev environment.
 - **SEC-C3:** SEC-RESID-1 (nonce-based re-auth for deletion) and SEC-OQ-1 (data-retention / backup policy) are accepted for the MVP build but must be resolved before beta; an external pen test is recommended.
 - **SEC-C4 (boundary note):** SEC-F-9 (weekly-aggregate bucketing, BD-OQ-1) was implemented here at explicit human direction though decision ownership is `backend-data-engineering`; backend must review and validate it against the WORK-012 golden vectors.
