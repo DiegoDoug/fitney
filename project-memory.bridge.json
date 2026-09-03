@@ -1,0 +1,9 @@
+{
+  "outputDir": ".project-memory",
+  "projectTitleProperty": "Project Name",
+  "projectRelationProperty": "Project",
+  "includeImplementationTasks": true,
+  "includeReviews": true,
+  "writeManifest": true,
+  "cleanGeneratedFiles": true
+}

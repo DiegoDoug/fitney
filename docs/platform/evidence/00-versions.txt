@@ -1,0 +1,4 @@
+### supabase --version
+2.67.1
+PostgreSQL 15.8 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 13.2.0, 64-bit
+

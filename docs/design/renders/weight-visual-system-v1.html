@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weight — Visual System v1 (Ledger)</title>
+<style>
+/* ============================================================
+   WEIGHT — VISUAL SYSTEM v1  ·  Thesis A "Ledger"
+   Direction: Utilitarian + Data-dense + Premium-through-restraint
+   Ground: "white sand"   ·   Hue: "Persian blue" tonal scale
+   Aeonik stand-in below (licence pending, CON-8) — do not treat
+   the fallback stack as the specified typeface.
+   ============================================================ */
+:root{
+  /* --- sand / warm neutral ramp --- */
+  --sand-0:#FBF9F4; --sand-50:#F4F1EA; --sand-100:#ECE8DE; --sand-150:#E4DFD0;
+  --sand-200:#D6CFBC; --sand-300:#BCB39B; --sand-600:#6B6455; --sand-800:#33302A; --sand-900:#201E19;
+  /* --- Persian blue ramp (accent @600 = #1C39BB) --- */
+  --blue-50:#EEF1FB; --blue-100:#DEE4F6; --blue-200:#B9C4EC; --blue-300:#8B9EE0;
+  --blue-400:#5B73D2; --blue-500:#3450C4; --blue-600:#1C39BB; --blue-700:#182F94; --blue-900:#0E1A4F;
+  --danger:#9B2C2C;
+
+  /* --- semantic (light) --- */
+  --canvas:var(--sand-50); --surface:var(--sand-100); --raised:var(--sand-0); --sunken:var(--sand-150);
+  --text:var(--sand-900); --text-2:var(--sand-800); --muted:var(--sand-600);
+  --border:var(--sand-200); --border-strong:var(--sand-300);
+  --accent:var(--blue-600); --accent-press:var(--blue-700); --accent-quiet:var(--blue-50);
+  --on-accent:#FFFFFF; --focus:var(--blue-500);
+  --nm-light:rgba(255,255,255,.6); --nm-shadow:rgba(150,140,110,.35);
+
+  --r-field:12px; --r-card:16px; --r-primary:20px; --r-sheet:24px; --r-pill:999px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px;
+  --font:"Aeonik","Inter","SF Pro Text",-apple-system,"Segoe UI",Roboto,system-ui,sans-serif;
+}
+.dark{
+  --canvas:#14130F; --surface:#1B1A15; --raised:#211F19; --sunken:#2B2820;
+  --text:#F2EFE6; --text-2:#C9C4B6; --muted:#8A8474;
+  --border:#37332A; --border-strong:#544F41;
+  --accent:var(--blue-300); --accent-press:var(--blue-200); --accent-quiet:rgba(139,158,224,.16);
+  --on-accent:#14130F; --focus:var(--blue-300);
+  --nm-light:rgba(255,255,255,.04); --nm-shadow:rgba(0,0,0,.55);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:#8b8574;color:#201E19;-webkit-font-smoothing:antialiased;padding:32px}
+h1.page{font:600 20px/1.3 var(--font);color:#fff;margin-bottom:4px}
+p.sub{font:400 13px/1.5 var(--font);color:#efeae0;margin-bottom:24px;max-width:70ch}
+.legend{color:#fff;font:500 12px/1.5 var(--font);margin:28px 0 10px}
+.wrap{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+
+/* ---------- phone frame ---------- */
+.phone{width:390px;background:var(--canvas);border-radius:34px;overflow:hidden;
+  border:1px solid rgba(0,0,0,.18);box-shadow:0 24px 60px -20px rgba(0,0,0,.45)}
+.phone .status{height:34px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;font:600 12px/1 var(--font);color:var(--text)}
+.screen{padding:0 var(--s4) var(--s4)}
+.caption{color:#fff;font:600 12px/1.4 var(--font);margin:0 0 8px}
+
+/* ---------- primitives ---------- */
+.h-title{font:700 28px/1.2 var(--font);color:var(--text);letter-spacing:-.01em}
+.h-title .chev{font-size:16px;color:var(--muted);margin-left:6px}
+.h-2{font:600 22px/1.25 var(--font);color:var(--text);letter-spacing:-.005em}
+.h-3{font:500 18px/1.3 var(--font);color:var(--text)}
+.lbl{font:500 14px/1.2 var(--font);color:var(--text-2)}
+.cap{font:400 12px/1.35 var(--font);color:var(--muted)}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.metric{font:500 20px/1.15 var(--font);color:var(--text)}
+.row-sep{height:1px;background:var(--border);margin:0 calc(-1*var(--s4))}
+
+.btn{height:52px;border-radius:var(--r-primary);border:1px solid var(--accent);
+  background:var(--accent);color:var(--on-accent);font:600 16px/1 var(--font);
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  box-shadow:-3px -3px 6px var(--nm-light), 4px 5px 12px var(--nm-shadow)}
+.btn.secondary{background:var(--raised);color:var(--text);border-color:var(--border-strong);
+  box-shadow:-2px -2px 4px var(--nm-light), 2px 3px 8px var(--nm-shadow)}
+.btn.ghost{background:transparent;border-color:var(--border-strong);color:var(--text);box-shadow:none}
+.btn.sm{height:40px;font-size:14px;border-radius:var(--r-field);width:auto;padding:0 16px}
+
+/* ---------- week strip ---------- */
+.week{display:flex;justify-content:space-between;gap:6px;margin:14px 0 18px}
+.day{flex:1;height:56px;border-radius:var(--r-field);background:var(--raised);border:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+.day .d{font:500 12px/1 var(--font);color:var(--muted)}
+.day .n{font:600 14px/1 var(--font);color:var(--text)}
+.day .mk{width:6px;height:6px;border-radius:50%}
+.day .mk.plan{background:transparent;border:1.5px solid var(--accent)}
+.day .mk.done{background:var(--accent)}
+.day .mk.miss{width:8px;height:2px;background:var(--border-strong);border-radius:2px}
+.day.sel{background:var(--accent-quiet);border-color:var(--accent)}
+.day.today .n{color:var(--accent)}
+.day.today{border-color:var(--accent);border-width:1.5px}
+
+/* ---------- workout card ---------- */
+.card{background:var(--raised);border:1px solid var(--border);border-radius:var(--r-primary);
+  padding:var(--s4);box-shadow:-2px -2px 5px var(--nm-light), 3px 4px 10px var(--nm-shadow)}
+.card.flat{box-shadow:none;background:var(--surface)}
+.card.primary{background:var(--accent-quiet);border-color:var(--accent)}
+.card .kicker{font:600 11px/1 var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.card .meta{display:flex;gap:14px;margin-top:6px}
+.card .meta span{font:400 12px/1.3 var(--font);color:var(--muted)}
+
+/* ---------- ledger stat block (no cards) ---------- */
+.ledger{display:flex;gap:0;margin-top:6px}
+.ledger .col{flex:1;padding:12px 0}
+.ledger .col + .col{border-left:1px solid var(--border);padding-left:14px}
+.ledger .k{font:400 12px/1.2 var(--font);color:var(--muted)}
+.ledger .v{font:500 20px/1.2 var(--font);color:var(--text);margin-top:3px;white-space:nowrap}
+.ledger .v small{font:400 12px/1 var(--font);color:var(--muted)}
+
+/* ---------- SET ROW  (signature move) ---------- */
+.setrow{display:grid;grid-template-columns:14px 64px 1fr 58px 40px 44px;gap:8px;align-items:center;
+  height:56px;border-bottom:1px solid var(--border);padding:0 2px;position:relative}
+.setrow .mk{width:4px;height:26px;border-radius:2px;background:var(--border-strong);justify-self:center}
+.setrow.work .mk{background:var(--muted)}
+.setrow.warm .mk{background:var(--border-strong)}
+.setrow .prev{font:400 12px/1.2 var(--font);color:var(--muted);text-align:right}
+.setrow .tgt{font:400 13px/1.2 var(--font);color:var(--muted)}
+.setrow .well{height:40px;border-radius:10px;background:var(--sunken);border:1px solid var(--border-strong);
+  display:flex;align-items:center;justify-content:center;font:500 16px/1 var(--font);color:var(--text)}
+.setrow .well.reps{font-size:15px}
+.setrow .chk{width:44px;height:40px;border-radius:10px;border:1px solid var(--border-strong);
+  background:var(--raised);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:18px}
+
+/* recorded */
+.setrow.done .mk{background:var(--accent)}
+.setrow.done .well{background:transparent;border-color:transparent;color:var(--text);font-weight:600}
+.setrow.done .chk{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.setrow.done .tgt{text-decoration:line-through;opacity:.5}
+
+/* active / focused — the ONLY raised-2 element in view */
+.setrow.active{background:var(--raised);border:1.5px solid var(--accent);border-radius:12px;height:60px;
+  box-shadow:-3px -3px 7px var(--nm-light), 4px 6px 14px var(--nm-shadow);margin:6px 0;padding:0 8px}
+.setrow.active .well{border-color:var(--accent);color:var(--text);font-weight:600}
+.setrow.active .chk{border-color:var(--accent);color:var(--accent)}
+
+/* prescribed suggestion — not yet recorded */
+.setrow.suggest .well{background:transparent;border-style:dashed;border-color:var(--border-strong);color:var(--muted)}
+.setrow.suggest .chk{border-style:dashed}
+
+.setrow-head{display:grid;grid-template-columns:14px 64px 1fr 58px 40px 44px;gap:8px;
+  font:500 10px/1 var(--font);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 2px 8px}
+.setrow-head span:nth-child(2){text-align:right}
+
+/* ---------- sticky active context ---------- */
+.sticky{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);
+  padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin:12px 0}
+.sticky .now{font:500 15px/1.2 var(--font);color:var(--text)}
+.sticky .now small{display:block;font:400 12px/1.2 var(--font);color:var(--muted);margin-top:3px}
+.timer{display:flex;align-items:center;gap:10px;background:var(--raised);border:1.5px solid var(--accent);
+  border-radius:var(--r-pill);padding:8px 12px;box-shadow:-2px -2px 5px var(--nm-light),3px 4px 10px var(--nm-shadow)}
+.timer .t{font:500 16px/1 var(--font);color:var(--accent)}
+.timer .add{font:600 12px/1 var(--font);color:var(--muted)}
+
+/* ---------- app bars ---------- */
+.appbar{display:flex;align-items:center;justify-content:space-between;padding:6px 0 2px}
+.appbar .fin{font:600 15px/1 var(--font);color:var(--accent)}
+.appbar .el{font:500 15px/1 var(--font);color:var(--text)}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--surface);border:1px solid var(--border-strong);
+  display:flex;align-items:center;justify-content:center;font:600 12px/1 var(--font);color:var(--text-2)}
+
+.nav{display:flex;align-items:flex-end;justify-content:space-between;padding:10px 22px 16px;
+  border-top:1px solid var(--border);background:var(--canvas)}
+.nav .item{display:flex;flex-direction:column;align-items:center;gap:4px;font:500 10px/1 var(--font);color:var(--muted)}
+.nav .item.on{color:var(--accent)}
+.nav .item .ic{width:22px;height:22px;position:relative}
+.nav .item .ic::before{content:"";position:absolute;inset:0;border:2px solid currentColor;border-radius:6px}
+/* Today: filled corner */
+.nav .item:nth-child(1) .ic::after{content:"";position:absolute;left:4px;top:4px;width:7px;height:7px;background:currentColor;border-radius:2px}
+/* Plan: 2x2 grid */
+.nav .item:nth-child(2) .ic::before{border-radius:5px}
+.nav .item:nth-child(2) .ic::after{content:"";position:absolute;left:5px;top:5px;width:12px;height:12px;
+  background:radial-gradient(currentColor 40%,transparent 42%) 0 0/6px 6px}
+/* Progress: ascending bars */
+.nav .item:nth-child(4) .ic{border:0}
+.nav .item:nth-child(4) .ic::before{border:0}
+.nav .item:nth-child(4) .ic::after{content:"";position:absolute;left:1px;bottom:1px;width:20px;height:20px;
+  background:linear-gradient(currentColor 0 0) 0 100%/5px 8px no-repeat,
+             linear-gradient(currentColor 0 0) 7px 100%/5px 14px no-repeat,
+             linear-gradient(currentColor 0 0) 14px 100%/5px 20px no-repeat}
+/* Library: stacked lines */
+.nav .item:nth-child(5) .ic{border:0}
+.nav .item:nth-child(5) .ic::before{border:0}
+.nav .item:nth-child(5) .ic::after{content:"";position:absolute;left:1px;top:2px;width:20px;height:18px;
+  background:linear-gradient(currentColor 0 0) 0 0/20px 2.5px no-repeat,
+             linear-gradient(currentColor 0 0) 0 7px/20px 2.5px no-repeat,
+             linear-gradient(currentColor 0 0) 0 14px/14px 2.5px no-repeat}
+.nav .plus{width:52px;height:52px;border-radius:18px;background:var(--accent);color:var(--on-accent);
+  display:flex;align-items:center;justify-content:center;font:600 26px/1 var(--font);transform:translateY(-6px);
+  box-shadow:-3px -3px 6px var(--nm-light),4px 6px 14px var(--nm-shadow)}
+
+/* ---------- sync indicator + resume pill ---------- */
+.sync{display:inline-flex;align-items:center;gap:7px;font:500 12px/1 var(--font);color:var(--muted);margin-top:12px}
+.sync .dot{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--muted)}
+.sync.saved .dot{background:var(--muted)}
+.sync.syncing .dot{border-color:var(--accent)}
+.sync.attn{color:var(--danger)} .sync.attn .dot{border-color:var(--danger);background:var(--danger)}
+.resume{position:relative;margin:0 var(--s4);background:var(--raised);border:1.5px solid var(--accent);border-radius:var(--r-pill);
+  padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
+  box-shadow:-3px -3px 7px var(--nm-light),4px 6px 14px var(--nm-shadow)}
+.resume .l{font:600 14px/1.2 var(--font);color:var(--text)}
+.resume .l small{display:block;font:400 12px/1 var(--font);color:var(--muted);margin-top:2px}
+
+/* ---------- segmented ---------- */
+.seg{display:flex;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-field);padding:3px;gap:3px;margin:14px 0}
+.seg button{flex:1;height:36px;border:0;border-radius:9px;background:transparent;font:500 13px/1 var(--font);color:var(--muted)}
+.seg button.on{background:var(--raised);color:var(--text);border:1px solid var(--border-strong);
+  box-shadow:-1px -1px 3px var(--nm-light),1px 2px 5px var(--nm-shadow)}
+
+/* ---------- mini bar chart ---------- */
+.bars{display:flex;align-items:flex-end;gap:10px;height:96px;padding:10px 0;border-bottom:1px solid var(--border)}
+.bars .b{flex:1;background:var(--accent);border-radius:4px 4px 0 0;position:relative}
+.bars .b::after{content:attr(data-v);position:absolute;top:-16px;left:0;right:0;text-align:center;
+  font:400 10px/1 var(--font);color:var(--muted)}
+.bars .b .x{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font:400 10px/1 var(--font);color:var(--muted)}
+.pr{display:flex;align-items:baseline;gap:8px;padding:11px 0;border-bottom:1px solid var(--border)}
+.pr .trophy{color:var(--accent);font-size:14px}
+.pr .n{font:500 14px/1.3 var(--font);color:var(--text)}
+.pr .v{margin-left:auto;font:500 15px/1 var(--font);color:var(--text)}
+.pr .f{font:400 11px/1 var(--font);color:var(--muted)}
+
+/* ---------- component board ---------- */
+.board{background:var(--canvas);border-radius:20px;padding:22px;width:390px;border:1px solid rgba(0,0,0,.15)}
+.board h3{font:600 13px/1 var(--font);color:var(--text);margin:18px 0 10px}
+.board h3:first-child{margin-top:0}
+.swatch{display:flex;gap:6px;flex-wrap:wrap}
+.sw{width:52px;height:44px;border-radius:8px;border:1px solid rgba(0,0,0,.12);display:flex;align-items:flex-end;
+  font:400 9px/1 var(--font);color:#000;padding:3px;justify-content:flex-start}
+.empty{text-align:center;padding:28px 16px}
+.empty .h{font:600 16px/1.3 var(--font);color:var(--text)}
+.empty .p{font:400 13px/1.4 var(--font);color:var(--muted);margin:6px 0 16px}
+.stack>*+*{margin-top:10px}
+.small-note{font:400 11px/1.4 var(--font);color:#efeae0;max-width:60ch;margin-top:6px}
+</style>
+</head>
+<body>
+
+<h1 class="page">Weight — Visual System v1 · “Ledger”</h1>
+<p class="sub">Utilitarian + data-dense + premium-through-restraint. “White sand” warm ground, single Persian-blue tonal scale.
+Signature move: the <strong>Set Row</strong> (prescribed → active → recorded). Restraint rule: only the live session’s running
+elements use raised-2 elevation and full-strength blue. Neumorphism is hierarchy only — never the sole cue for any state.
+Type shown in a fallback stack; Aeonik pending licence (CON-8).</p>
+
+<div class="legend">1 · Core screens — light (“white sand”)</div>
+<div class="wrap">
+
+  <!-- TODAY -->
+  <div>
+    <p class="caption">Today — planned day</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G ▚▚ 84%</span></div>
+      <div class="screen">
+        <div class="appbar"><span class="h-title">Wed 2 Sep<span class="chev">▾</span></span><span class="avatar">DA</span></div>
+        <div class="week">
+          <div class="day"><span class="d">S</span><span class="n">31</span><span class="mk done"></span></div>
+          <div class="day"><span class="d">M</span><span class="n">1</span><span class="mk done"></span></div>
+          <div class="day today sel"><span class="d">T</span><span class="n">2</span><span class="mk plan"></span></div>
+          <div class="day"><span class="d">W</span><span class="n">3</span><span class="mk plan"></span></div>
+          <div class="day"><span class="d">T</span><span class="n">4</span><span class="mk"></span></div>
+          <div class="day"><span class="d">F</span><span class="n">5</span><span class="mk plan"></span></div>
+          <div class="day"><span class="d">S</span><span class="n">6</span><span class="mk"></span></div>
+        </div>
+        <div class="card primary">
+          <span class="kicker">Today · planned</span>
+          <div class="h-2" style="margin-top:6px">Lower A — Squat focus</div>
+          <div class="meta"><span>5 exercises</span><span>18 working sets</span><span>~52 min</span></div>
+          <div style="margin-top:14px"><button class="btn">Start workout</button></div>
+        </div>
+        <div class="setrow-head" style="grid-template-columns:1fr;margin-top:20px"><span>This week</span></div>
+        <div class="ledger">
+          <div class="col"><div class="k">Sessions</div><div class="v num">2<small> / 4</small></div></div>
+          <div class="col"><div class="k">Working sets</div><div class="v num">41</div></div>
+          <div class="col"><div class="k">Volume</div><div class="v num">22,140<small> kg</small></div></div>
+        </div>
+        <div class="row-sep" style="margin-top:4px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 2px">
+          <div><div class="lbl">Upper B</div><div class="cap">Mon 31 Aug · 24 sets · 6,980 kg</div></div>
+          <span class="cap">History ›</span>
+        </div>
+        <div class="row-sep"></div>
+        <div class="sync saved" style="margin-top:14px"><span class="dot"></span>Saved on device</div>
+      </div>
+      <div class="nav">
+        <div class="item on"><span class="ic"></span>Today</div>
+        <div class="item"><span class="ic"></span>Plan</div>
+        <div class="plus">+</div>
+        <div class="item"><span class="ic"></span>Progress</div>
+        <div class="item"><span class="ic"></span>Library</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVE WORKOUT -->
+  <div>
+    <p class="caption">Active workout — set row states</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>✕ offline · 83%</span></div>
+      <div class="screen">
+        <div class="appbar"><span class="el" style="color:var(--muted)">‹ Minimise</span><span class="el num">00:18:24</span><span class="fin">Finish</span></div>
+        <div class="sticky">
+          <div class="now">Back Squat <small>Set 3 of 4 · working</small></div>
+          <div class="timer"><span class="t num">1:30</span><span class="add">rest · +15s</span></div>
+        </div>
+        <div class="h-3">Back Squat</div>
+        <div class="setrow-head">
+          <span></span><span>Prev</span><span>Target</span><span>kg</span><span>reps</span><span></span>
+        </div>
+        <div class="setrow warm done">
+          <span class="mk"></span><span class="prev num">60 × 8</span><span class="tgt num">60 × 8</span>
+          <span class="well num">60</span><span class="well reps num">8</span><span class="chk">✓</span>
+        </div>
+        <div class="setrow work done">
+          <span class="mk"></span><span class="prev num">100 × 5</span><span class="tgt num">102.5 × 8</span>
+          <span class="well num">102.5</span><span class="well reps num">8</span><span class="chk">✓</span>
+        </div>
+        <div class="setrow work active">
+          <span class="mk"></span><span class="prev num">100 × 5</span><span class="tgt num">102.5 × 8</span>
+          <span class="well num">102.5</span><span class="well reps num">8</span><span class="chk">○</span>
+        </div>
+        <div class="setrow work suggest">
+          <span class="mk"></span><span class="prev num">—</span><span class="tgt num">102.5 × 8</span>
+          <span class="well num">102.5</span><span class="well reps num">8</span><span class="chk">○</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 2px">
+          <div class="h-3" style="color:var(--muted)">Romanian Deadlift</div><span class="cap">3 sets · collapsed ▾</span>
+        </div>
+        <div class="row-sep"></div>
+        <div style="margin-top:14px"><button class="btn ghost sm">+ Add exercise</button></div>
+        <div class="sync saved"><span class="dot"></span>Saved on device · will sync when online</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLAN -->
+  <div>
+    <p class="caption">Plan — week</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G ▚▚ 84%</span></div>
+      <div class="screen">
+        <div class="appbar"><span class="h-title">1–7 Sep<span class="chev">▾</span></span><span class="cap">Today ›</span></div>
+        <div class="week">
+          <div class="day done"><span class="d">S</span><span class="n">31</span><span class="mk done"></span></div>
+          <div class="day"><span class="d">M</span><span class="n">1</span><span class="mk done"></span></div>
+          <div class="day today sel"><span class="d">T</span><span class="n">2</span><span class="mk plan"></span></div>
+          <div class="day"><span class="d">W</span><span class="n">3</span><span class="mk plan"></span></div>
+          <div class="day"><span class="d">T</span><span class="n">4</span><span class="mk miss"></span></div>
+          <div class="day"><span class="d">F</span><span class="n">5</span><span class="mk plan"></span></div>
+          <div class="day"><span class="d">S</span><span class="n">6</span><span class="mk"></span></div>
+        </div>
+        <div class="lbl" style="margin-bottom:8px">Tuesday 2 Sep</div>
+        <div class="card">
+          <span class="kicker">Planned</span>
+          <div class="h-3" style="margin-top:4px">Lower A — Squat focus</div>
+          <div class="meta"><span>5 exercises</span><span>Back Squat · RDL · Leg Press…</span></div>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button class="btn secondary sm">Edit</button><button class="btn ghost sm">Move</button><button class="btn ghost sm">Duplicate</button>
+          </div>
+        </div>
+        <div style="margin-top:12px"><button class="btn ghost sm">+ Add workout to Tuesday</button></div>
+        <div class="setrow-head" style="grid-template-columns:1fr;margin-top:18px"><span>Week</span></div>
+        <div class="ledger">
+          <div class="col"><div class="k">Planned</div><div class="v num">3</div></div>
+          <div class="col"><div class="k">Completed</div><div class="v num">2</div></div>
+          <div class="col"><div class="k">Est. volume</div><div class="v num">31k<small> kg</small></div></div>
+        </div>
+        <div class="row-sep" style="margin-top:4px"></div>
+        <div class="lbl" style="margin-top:14px">Week actions</div>
+        <div class="stack" style="margin-top:8px">
+          <button class="btn secondary sm" style="width:100%">Copy previous week</button>
+          <button class="btn ghost sm" style="width:100%">Use week template</button>
+          <button class="btn ghost sm" style="width:100%">Save week as template</button>
+        </div>
+      </div>
+      <div class="nav">
+        <div class="item"><span class="ic"></span>Today</div>
+        <div class="item on"><span class="ic"></span>Plan</div>
+        <div class="plus">+</div>
+        <div class="item"><span class="ic"></span>Progress</div>
+        <div class="item"><span class="ic"></span>Library</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div>
+    <p class="caption">Progress — Overview</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G ▚▚ 84%</span></div>
+      <div class="screen">
+        <div class="appbar"><span class="h-title">Progress</span><span class="avatar">DA</span></div>
+        <div class="seg">
+          <button class="on">Overview</button><button>History</button><button>PRs</button><button>Trends</button>
+        </div>
+        <div class="lbl">Consistency</div>
+        <div class="metric num" style="margin:4px 0 2px">11 <span style="font-size:14px;color:var(--muted)">of 12 sessions · 3-week streak</span></div>
+        <div class="row-sep" style="margin-top:12px"></div>
+        <div class="lbl" style="margin-top:14px">Weekly volume — kg</div>
+        <div class="bars">
+          <div class="b" style="height:64%" data-v="18.2k"><span class="x">W31</span></div>
+          <div class="b" style="height:82%" data-v="21.0k"><span class="x">W32</span></div>
+          <div class="b" style="height:74%" data-v="19.4k"><span class="x">W33</span></div>
+          <div class="b" style="height:90%" data-v="22.1k"><span class="x">W34</span></div>
+        </div>
+        <div class="lbl" style="margin:24px 0 2px">Latest personal records</div>
+        <div class="pr"><span class="trophy">▲</span><span class="n">Back Squat</span><span class="v num">132 kg</span></div>
+        <div class="pr" style="margin-top:-2px"><span class="f">est. 1RM · Epley · 102.5 kg × 8</span></div>
+        <div class="pr"><span class="trophy">▲</span><span class="n">Bench Press</span><span class="v num">5 × 90 kg</span></div>
+        <div class="lbl" style="margin:20px 0 6px">Most trained</div>
+        <div class="cap">Back Squat · Bench Press · Romanian Deadlift · Barbell Row</div>
+      </div>
+      <div class="nav">
+        <div class="item"><span class="ic"></span>Today</div>
+        <div class="item"><span class="ic"></span>Plan</div>
+        <div class="plus">+</div>
+        <div class="item on"><span class="ic"></span>Progress</div>
+        <div class="item"><span class="ic"></span>Library</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="legend">2 · Dark (“night sand”) — same tokens, blue lightens for contrast</div>
+<div class="wrap">
+  <div class="dark">
+    <p class="caption">Today — dark</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G ▚▚ 84%</span></div>
+      <div class="screen">
+        <div class="appbar"><span class="h-title">Wed 2 Sep<span class="chev">▾</span></span><span class="avatar">DA</span></div>
+        <div class="week">
+          <div class="day"><span class="d">S</span><span class="n">31</span><span class="mk done"></span></div>
+          <div class="day"><span class="d">M</span><span class="n">1</span><span class="mk done"></span></div>
+          <div class="day today sel"><span class="d">T</span><span class="n">2</span><span class="mk plan"></span></div>
+          <div class="day"><span class="d">W</span><span class="n">3</span><span class="mk plan"></span></div>
+          <div class="day"><span class="d">T</span><span class="n">4</span><span class="mk"></span></div>
+          <div class="day"><span class="d">F</span><span class="n">5</span><span class="mk plan"></span></div>
+          <div class="day"><span class="d">S</span><span class="n">6</span><span class="mk"></span></div>
+        </div>
+        <div class="card primary">
+          <span class="kicker">Today · planned</span>
+          <div class="h-2" style="margin-top:6px">Lower A — Squat focus</div>
+          <div class="meta"><span>5 exercises</span><span>18 working sets</span><span>~52 min</span></div>
+          <div style="margin-top:14px"><button class="btn">Start workout</button></div>
+        </div>
+        <div class="setrow-head" style="grid-template-columns:1fr;margin-top:20px"><span>This week</span></div>
+        <div class="ledger">
+          <div class="col"><div class="k">Sessions</div><div class="v num">2<small> / 4</small></div></div>
+          <div class="col"><div class="k">Working sets</div><div class="v num">41</div></div>
+          <div class="col"><div class="k">Volume</div><div class="v num">22,140<small> kg</small></div></div>
+        </div>
+        <div class="row-sep" style="margin-top:4px"></div>
+        <div class="sync saved" style="margin-top:14px"><span class="dot"></span>Saved on device</div>
+      </div>
+      <div class="nav">
+        <div class="item on"><span class="ic"></span>Today</div>
+        <div class="item"><span class="ic"></span>Plan</div>
+        <div class="plus">+</div>
+        <div class="item"><span class="ic"></span>Progress</div>
+        <div class="item"><span class="ic"></span>Library</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dark">
+    <p class="caption">Active workout — dark · offline</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>✕ offline · 83%</span></div>
+      <div class="screen">
+        <div class="appbar"><span class="el" style="color:var(--muted)">‹ Minimise</span><span class="el num">00:18:24</span><span class="fin">Finish</span></div>
+        <div class="sticky">
+          <div class="now">Back Squat <small>Set 3 of 4 · working</small></div>
+          <div class="timer"><span class="t num">1:30</span><span class="add">rest · +15s</span></div>
+        </div>
+        <div class="h-3">Back Squat</div>
+        <div class="setrow-head"><span></span><span>Prev</span><span>Target</span><span>kg</span><span>reps</span><span></span></div>
+        <div class="setrow warm done">
+          <span class="mk"></span><span class="prev num">60 × 8</span><span class="tgt num">60 × 8</span>
+          <span class="well num">60</span><span class="well reps num">8</span><span class="chk">✓</span>
+        </div>
+        <div class="setrow work done">
+          <span class="mk"></span><span class="prev num">100 × 5</span><span class="tgt num">102.5 × 8</span>
+          <span class="well num">102.5</span><span class="well reps num">8</span><span class="chk">✓</span>
+        </div>
+        <div class="setrow work active">
+          <span class="mk"></span><span class="prev num">100 × 5</span><span class="tgt num">102.5 × 8</span>
+          <span class="well num">102.5</span><span class="well reps num">8</span><span class="chk">○</span>
+        </div>
+        <div class="setrow work suggest">
+          <span class="mk"></span><span class="prev num">—</span><span class="tgt num">102.5 × 8</span>
+          <span class="well num">102.5</span><span class="well reps num">8</span><span class="chk">○</span>
+        </div>
+        <div style="margin-top:16px"><button class="btn ghost sm">+ Add exercise</button></div>
+        <div class="sync saved"><span class="dot"></span>Saved on device · will sync when online</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="legend">3 · Secondary states</div>
+<div class="wrap">
+  <div>
+    <p class="caption">Today — nothing planned (empty state)</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G ▚▚ 84%</span></div>
+      <div class="screen">
+        <div class="appbar"><span class="h-title">Thu 4 Sep<span class="chev">▾</span></span><span class="avatar">DA</span></div>
+        <div class="week">
+          <div class="day"><span class="d">S</span><span class="n">31</span><span class="mk done"></span></div>
+          <div class="day"><span class="d">M</span><span class="n">1</span><span class="mk done"></span></div>
+          <div class="day"><span class="d">T</span><span class="n">2</span><span class="mk done"></span></div>
+          <div class="day"><span class="d">W</span><span class="n">3</span><span class="mk done"></span></div>
+          <div class="day today sel"><span class="d">T</span><span class="n">4</span><span class="mk"></span></div>
+          <div class="day"><span class="d">F</span><span class="n">5</span><span class="mk plan"></span></div>
+          <div class="day"><span class="d">S</span><span class="n">6</span><span class="mk"></span></div>
+        </div>
+        <div class="card flat empty">
+          <div class="h">Nothing planned for today</div>
+          <div class="p">Pick up where you left off, or start fresh.</div>
+          <div class="stack">
+            <button class="btn">Repeat last workout</button>
+            <button class="btn secondary">Choose a workout template</button>
+            <button class="btn ghost">Start empty workout</button>
+          </div>
+        </div>
+        <div class="sync attn" style="margin-top:16px"><span class="dot"></span>2 changes need attention — tap to review</div>
+      </div>
+      <div class="nav">
+        <div class="item on"><span class="ic"></span>Today</div>
+        <div class="item"><span class="ic"></span>Plan</div>
+        <div class="plus">+</div>
+        <div class="item"><span class="ic"></span>Progress</div>
+        <div class="item"><span class="ic"></span>Library</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="caption">Log action sheet + Resume pill</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G ▚▚ 84%</span></div>
+      <div class="screen" style="opacity:.5;filter:blur(1px)">
+        <div class="appbar"><span class="h-title">Wed 2 Sep</span><span class="avatar">DA</span></div>
+        <div class="card" style="height:120px"></div>
+      </div>
+      <div class="resume" style="margin-bottom:8px">
+        <div class="l">Resume — Lower A<small>18:24 · Back Squat, set 3</small></div>
+        <button class="btn sm">Resume</button>
+      </div>
+      <div style="background:var(--raised);border:1px solid var(--border);border-radius:var(--r-sheet) var(--r-sheet) 0 0;
+        padding:18px 16px 22px;box-shadow:0 -8px 24px -6px var(--nm-shadow)">
+        <div style="width:36px;height:4px;border-radius:2px;background:var(--border-strong);margin:0 auto 16px"></div>
+        <div class="h-3" style="margin-bottom:10px">Start or log a workout</div>
+        <div class="stack">
+          <button class="btn">Resume workout</button>
+          <button class="btn secondary">Repeat last workout</button>
+          <button class="btn ghost">Choose a workout template</button>
+          <button class="btn ghost">Start empty workout</button>
+          <button class="btn ghost">Log a past workout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPONENT BOARD -->
+  <div class="board">
+    <h3>Persian-blue scale</h3>
+    <div class="swatch">
+      <div class="sw" style="background:#EEF1FB">50</div><div class="sw" style="background:#DEE4F6">100</div>
+      <div class="sw" style="background:#B9C4EC">200</div><div class="sw" style="background:#8B9EE0">300</div>
+      <div class="sw" style="background:#5B73D2;color:#fff">400</div><div class="sw" style="background:#3450C4;color:#fff">500</div>
+      <div class="sw" style="background:#1C39BB;color:#fff">600</div><div class="sw" style="background:#182F94;color:#fff">700</div>
+      <div class="sw" style="background:#0E1A4F;color:#fff">900</div>
+    </div>
+    <h3>White-sand scale</h3>
+    <div class="swatch">
+      <div class="sw" style="background:#FBF9F4">0</div><div class="sw" style="background:#F4F1EA">50</div>
+      <div class="sw" style="background:#ECE8DE">100</div><div class="sw" style="background:#E4DFD0">150</div>
+      <div class="sw" style="background:#D6CFBC">200</div><div class="sw" style="background:#BCB39B">300</div>
+      <div class="sw" style="background:#6B6455;color:#fff">600</div><div class="sw" style="background:#33302A;color:#fff">800</div>
+      <div class="sw" style="background:#201E19;color:#fff">900</div>
+    </div>
+    <h3>Set Row — state ladder</h3>
+    <div class="setrow-head"><span></span><span>Prev</span><span>Target</span><span>kg</span><span>reps</span><span></span></div>
+    <div class="setrow work suggest"><span class="mk"></span><span class="prev num">—</span><span class="tgt num">100 × 8</span><span class="well num">100</span><span class="well reps num">8</span><span class="chk">○</span></div>
+    <div class="cap" style="margin:4px 0 8px">prescribed — dashed wells, muted, not yet recorded</div>
+    <div class="setrow work active"><span class="mk"></span><span class="prev num">95 × 8</span><span class="tgt num">100 × 8</span><span class="well num">100</span><span class="well reps num">8</span><span class="chk">○</span></div>
+    <div class="cap" style="margin:4px 0 8px">active — raised-2, 1.5px blue frame (only raised element in view)</div>
+    <div class="setrow work done"><span class="mk"></span><span class="prev num">95 × 8</span><span class="tgt num">100 × 8</span><span class="well num">100</span><span class="well reps num">8</span><span class="chk">✓</span></div>
+    <div class="cap" style="margin:4px 0 0">recorded — filled marker + check, weight bolder, target struck through</div>
+    <h3>Buttons</h3>
+    <div class="stack"><button class="btn">Primary</button><button class="btn secondary">Secondary</button><button class="btn ghost">Ghost</button></div>
+    <h3>Day markers</h3>
+    <div class="week" style="margin:6px 0 0">
+      <div class="day today"><span class="d">T</span><span class="n">2</span><span class="mk plan"></span></div>
+      <div class="day"><span class="d">W</span><span class="n">3</span><span class="mk done"></span></div>
+      <div class="day"><span class="d">T</span><span class="n">4</span><span class="mk miss"></span></div>
+      <div class="day sel"><span class="d">F</span><span class="n">5</span><span class="mk plan"></span></div>
+      <div class="day"><span class="d">S</span><span class="n">6</span><span class="mk"></span></div>
+    </div>
+    <div class="cap" style="margin-top:6px">ring = planned · filled = completed · bar = missed · tint = selected · blue numeral = today (shape, not colour alone)</div>
+    <h3>Sync indicator</h3>
+    <div class="stack">
+      <div class="sync saved"><span class="dot"></span>Saved on device</div>
+      <div class="sync syncing"><span class="dot"></span>Syncing…</div>
+      <div class="sync attn"><span class="dot"></span>Needs attention</div>
+    </div>
+  </div>
+</div>
+
+<p class="small-note"><strong>v2 — after critique pass.</strong> Corrections applied from v1: minimise affordance labelled (was “‹ min”); prev/target column
+headers separated; ledger unit no longer wraps; timer pill de-crowded; planned-card kicker muted so only tint + CTA carry blue
+(restraint rule); “Saved on device” separated from the last-workout row by a rule; nav glyphs made schematic rather than bare
+squares; “Week actions” grouped and labelled. No hierarchy/focal defects were found in v1 — changes are craft-level.</p>
+<p class="small-note">Render is a disposable design prototype (HTML/CSS approximation of React Native surfaces), not production code.
+Neumorphic shadow pairs are softened for gym-light legibility; every state above also carries a non-shadow, non-hue cue
+(glyph, weight, border style, shape). Charts pair with exact tabular values and a list representation downstream.</p>
+
+</body>
+</html>

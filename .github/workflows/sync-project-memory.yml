@@ -1,0 +1,45 @@
+name: Sync Project Memory
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Generate .project-memory
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_PROJECT_PAGE_ID: ${{ vars.NOTION_PROJECT_PAGE_ID }}
+          NOTION_PROJECT_NAME: ${{ vars.NOTION_PROJECT_NAME }}
+          NOTION_PROJECTS_DB_ID: ${{ vars.NOTION_PROJECTS_DB_ID }}
+          NOTION_DECISIONS_DB_ID: ${{ vars.NOTION_DECISIONS_DB_ID }}
+          NOTION_ADRS_DB_ID: ${{ vars.NOTION_ADRS_DB_ID }}
+          NOTION_REQUIREMENTS_DB_ID: ${{ vars.NOTION_REQUIREMENTS_DB_ID }}
+          NOTION_ISSUES_DB_ID: ${{ vars.NOTION_ISSUES_DB_ID }}
+          NOTION_TASKS_DB_ID: ${{ vars.NOTION_TASKS_DB_ID }}
+          NOTION_MILESTONES_DB_ID: ${{ vars.NOTION_MILESTONES_DB_ID }}
+          NOTION_REVIEWS_DB_ID: ${{ vars.NOTION_REVIEWS_DB_ID }}
+          NOTION_HANDOFFS_DB_ID: ${{ vars.NOTION_HANDOFFS_DB_ID }}
+        run: npm run sync
+      - name: Commit mirror if changed
+        run: |
+          if git diff --quiet -- .project-memory; then
+            echo "No project-memory changes."
+            exit 0
+          fi
+          git config user.name "project-memory-bot"
+          git config user.email "project-memory-bot@users.noreply.github.com"
+          git add .project-memory
+          git commit -m "chore(memory): sync Notion project memory"
+          git push

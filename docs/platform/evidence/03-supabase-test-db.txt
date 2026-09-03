@@ -1,0 +1,57 @@
+Using workdir C:\Users\dandr\Fitney
+Connecting to local database...
+./01_rls_isolation_test.sql ......... 
+# Failed test 11: "B cannot update a global seed exercise"
+#       caught: no exception
+#       wanted: an exception
+# Failed test 13: "processed_operations has no update policy"
+#       caught: no exception
+#       wanted: an exception
+# Looks like you planned 20 tests but ran 17
+Failed 5/20 subtests 
+psql:02_sync_apply_test.sql:19: ERROR:  null value in column "tags" of relation "workout_templates" violates not-null constraint
+CONTEXT:  SQL statement "insert into workout_templates select r.* from jsonb_populate_record(null::workout_templates, $1) r returning version"
+PL/pgSQL function sync_apply(uuid,text,uuid,text,jsonb,integer) line 51 at EXECUTE
+./02_sync_apply_test.sql ............ 
+Dubious, test returned 3 (wstat 768, 0x300)
+Failed 14/14 subtests 
+psql:03_recompute_test.sql:31: ERROR:  function _week_start_for(date, integer) does not exist
+LINE 3:          _week_start_for((s.started_at at time zone s.timezo...
+                 ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+QUERY:  select s.user_id, se.exercise_id,
+         (s.status = 'completed'),
+         _week_start_for((s.started_at at time zone s.timezone)::date, coalesce(p.week_start,1))
+                                                   from session_exercises se
+  join workout_sessions s on s.id = se.session_id
+  left join profiles p on p.id = s.user_id
+  where se.id = v_row.session_exercise_id
+CONTEXT:  PL/pgSQL function trg_recompute_from_performed_set() line 6 at SQL statement
+./03_recompute_test.sql ............. 
+Dubious, test returned 3 (wstat 768, 0x300)
+Failed 8/8 subtests 
+psql:04_security_adversarial_test.sql:75: ERROR:  null value in column "tags" of relation "workout_templates" violates not-null constraint
+CONTEXT:  SQL statement "insert into workout_templates select r.* from jsonb_populate_record(null::workout_templates, $1) r returning version"
+PL/pgSQL function sync_apply(uuid,text,uuid,text,jsonb,integer) line 51 at EXECUTE
+./04_security_adversarial_test.sql .. 
+Dubious, test returned 3 (wstat 768, 0x300)
+Failed 18/24 subtests 
+
+Test Summary Report
+-------------------
+./01_rls_isolation_test.sql       (Wstat: 0 Tests: 17 Failed: 2)
+  Failed tests:  11, 13
+  Parse errors: Bad plan.  You planned 20 tests but ran 17.
+./02_sync_apply_test.sql          (Wstat: 768 (exited 3) Tests: 0 Failed: 0)
+  Non-zero exit status: 3
+  Parse errors: Bad plan.  You planned 14 tests but ran 0.
+./03_recompute_test.sql           (Wstat: 768 (exited 3) Tests: 0 Failed: 0)
+  Non-zero exit status: 3
+  Parse errors: Bad plan.  You planned 8 tests but ran 0.
+./04_security_adversarial_test.sql (Wstat: 768 (exited 3) Tests: 6 Failed: 0)
+  Non-zero exit status: 3
+  Parse errors: Bad plan.  You planned 24 tests but ran 6.
+Files=4, Tests=23,  0 wallclock secs ( 0.03 usr  0.01 sys +  0.03 cusr  0.02 csys =  0.09 CPU)
+Result: FAIL
+error running container: exit 1
+Try rerunning the command with --debug to troubleshoot the error.

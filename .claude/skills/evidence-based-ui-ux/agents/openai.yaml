@@ -1,0 +1,4 @@
+interface:
+  display_name: "Evidence-Based UI/UX"
+  short_description: "Evidence-backed UX and product design judgment"
+  default_prompt: "Use $evidence-based-ui-ux to review this experience, distinguish evidence from preference, and recommend the most context-appropriate UX improvements."

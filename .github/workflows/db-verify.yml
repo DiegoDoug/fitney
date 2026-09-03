@@ -1,0 +1,60 @@
+name: DB verify (migrations + RLS + pgTAP + lint)
+
+# Owning phase: platform-release (phase 8).
+# Merge gate for the Supabase data layer: proves the forward-only migration chain
+# applies from scratch, the schema lints clean, and the pgTAP suites pass on a
+# real Postgres 15 instance. Blocks client-engineering (roadmap WORK-018 / SEC-C1
+# / BD-C1) until green.
+#
+# NOTE (2026-09-02): this gate is expected to be RED until the following, routed
+# to their owners, are fixed and re-verified:
+#   * F-5  security-identity  — _week_start_for(date,integer) does not exist
+#                               (migration 20260902090006; recompute path throws)
+#   * F-2  backend-data-engineering / security-identity — sync_apply INSERT
+#                               fails NOT NULL on defaulted columns absent from a
+#                               partial payload; RPC leaks a raw exception
+#   * F-3/F-4/F-6  security-identity — pgTAP suite 01 assertion-matcher + plan
+#                               count corrections
+# See docs/platform/platform-release.md §"Verification".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - ".github/workflows/db-verify.yml"
+  pull_request:
+    paths:
+      - "supabase/**"
+      - ".github/workflows/db-verify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  db-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.67.1
+
+      - name: Start local database
+        run: supabase db start
+
+      - name: Apply migration chain from scratch (+ seed)
+        run: supabase db reset --local
+
+      - name: Lint schema (fail on error)
+        run: supabase db lint --local --level warning --fail-on error
+
+      - name: Run pgTAP suites (supabase/tests/01..04)
+        run: supabase test db
+
+      - name: Stop database
+        if: always()
+        run: supabase stop --no-backup

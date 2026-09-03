@@ -1,0 +1,90 @@
+# Supabase configuration — Weight / Fitney
+# Owning phase: platform-release (phase 8). Environments, secrets boundaries, and
+# hosted-project linkage are defined here; application/data/security *behaviour*
+# is owned by backend-data-engineering (migrations, sync_apply, recompute) and
+# security-identity (RLS, hardening, delete-account). See
+# docs/platform/platform-release.md and docs/security/security-identity.md.
+#
+# This file drives the LOCAL stack (`supabase start`). Settings marked "hosted:"
+# are the intended values for the linked development / production projects and
+# are applied there via the Supabase dashboard or `supabase config push` once a
+# project is linked (roadmap DEP-1). No secret values are stored in this file.
+
+project_id = "weight"
+
+[db]
+# Postgres major version. Pinned to 15 to match the architecture / backend
+# implementation contract (BD-DEC-01). Changing this is a backend-data-engineering
+# decision, not platform-release.
+major_version = 15
+
+[db.migrations]
+# Default migration path (supabase/migrations). Forward-only (ADR-0006).
+schema_paths = []
+
+[db.seed]
+# supabase/seed.sql is a NON-SHIPPABLE placeholder catalogue (OQ-4 / DEP-3).
+# It is applied locally and to the development project only; production seeding
+# waits on a licensed dataset.
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[api]
+enabled = true
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+# hosted: set site_url / additional_redirect_urls to the real app schemes/domains.
+site_url = "http://localhost:19006"
+additional_redirect_urls = ["http://localhost:19006"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+# hosted: keep signups open for MVP; revisit for invite-only beta.
+enable_signup = true
+enable_anonymous_sign_ins = false
+minimum_password_length = 8
+# hosted (security-identity SEC-C2): enable HaveIBeenPwned leaked-password check.
+password_requirements = "lower_upper_letters_digits"
+
+[auth.email]
+enable_signup = true
+# LOCAL ONLY: confirmations off so local/CI flows do not need a mailbox.
+# hosted (security-identity SEC-C2 / SEC-REQ-AUTH-*): MUST be true, plus
+# secure_email_change_enabled = true and a real SMTP sender.
+enable_confirmations = false
+secure_password_change = true
+max_frequency = "1m"
+
+[auth.rate_limit]
+# Conservative anti-abuse limits (apply locally and are pushed to hosted).
+email_sent = 10
+sign_in_sign_ups = 30
+token_refresh = 150
+token_verifications = 30
+
+[auth.mfa]
+# Deferred for MVP (single-user, email/password). Seam kept for later.
+max_enrolled_factors = 10
+
+[edge_runtime]
+enabled = true
+# Per-function verify_jwt is set below; the runtime default stays strict.
+policy = "oneshot"
+
+[functions.delete-account]
+# The one Edge Function required for MVP (ADR-0009, SEC-DEC-04).
+# Requires the caller's JWT; the function additionally checks re-auth freshness.
+verify_jwt = true
+# Dependencies are pinned via supabase/functions/delete-account/deno.json +
+# deno.lock (SEC-RESID-2). Server-only secrets (SERVICE_ROLE_KEY,
+# DELETION_RECEIPT_HMAC_KEY) are injected at deploy time, never committed.
+
+[analytics]
+# Logflare sidecar. On Windows the local analytics container needs the Docker
+# daemon on tcp://localhost:2375; it is non-essential for DB/RLS/pgTAP work and
+# may be disabled locally without affecting verification.
+enabled = true

@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fridgefirst",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "tests/FridgeFirst", "run", "dev", "--", "--port", "5173", "--strictPort"],
+      "port": 5173,
+      "url": "http://localhost:5173"
+    },
+    {
+      "name": "fridgefirst-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "tests/FridgeFirst", "run", "preview"],
+      "port": 4173,
+      "url": "http://localhost:4173"
+    }
+  ]
+}

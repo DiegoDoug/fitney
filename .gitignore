@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+
+# Supabase local stack artifacts (do NOT ignore migrations/, functions/, tests/,
+# seed.sql, config.toml, or functions/**/deno.lock — those are tracked).
+supabase/.branches/
+supabase/.temp/

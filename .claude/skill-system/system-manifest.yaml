@@ -1,0 +1,39 @@
+system: full-stack-development
+target: claude-code
+roadmap: development-roadmap.md
+phase_order:
+  - product-strategy
+  - evidence-based-ui-ux
+  - visual-ui-design
+  - software-architecture
+  - client-engineering
+  - backend-data-engineering
+  - security-identity
+  - platform-release
+  - quality-engineering
+  - production-operations
+  - implementation-orchestrator
+aliases:
+  ux-product-design: evidence-based-ui-ux
+external_existing_skills:
+  - evidence-based-ui-ux
+  - visual-ui-design
+attached_existing_skills:
+  - evidence-based-ui-ux
+  - visual-ui-design
+capability_attachments:
+  design-memory: visual-ui-design
+  apple-hig-adapter: visual-ui-design
+  design-knowledge-retrieval: visual-ui-design
+  taste-regression: visual-ui-design
+  visual-quality-gate: quality-engineering
+included_skills:
+  - product-strategy
+  - software-architecture
+  - client-engineering
+  - backend-data-engineering
+  - security-identity
+  - platform-release
+  - quality-engineering
+  - production-operations
+  - implementation-orchestrator

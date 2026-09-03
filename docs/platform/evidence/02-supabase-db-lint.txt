@@ -1,0 +1,25 @@
+Using workdir C:\Users\dandr\Fitney
+Connecting to local database...
+Linting schema: extensions
+Linting schema: public
+[
+  {
+    "function": "public.recompute_exercise_prs",
+    "issues": [
+      {
+        "level": "warning",
+        "message": "target type is different type than source type",
+        "statement": {
+          "lineNumber": "5",
+          "text": "statement block"
+        },
+        "hint": "The input expression type does not have an assignment cast to the target type.",
+        "detail": "cast \"text\" value to \"uuid[]\" type",
+        "context": "during statement block local variable \"v_keep\" initialization on line 3",
+        "sqlState": "42804"
+      }
+    ]
+  }
+]
+A new version of Supabase CLI is available: v2.116.0 (currently installed v2.67.1)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

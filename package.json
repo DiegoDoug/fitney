@@ -1,0 +1,13 @@
+{
+  "name": "notion-project-memory-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "sync": "node --env-file=.env src/cli.mjs sync",
+    "check": "node --env-file=.env src/cli.mjs check"
+  }
+}

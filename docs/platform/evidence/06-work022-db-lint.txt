@@ -1,0 +1,14 @@
+################ db lint --level warning ################
+Connecting to local database...
+Linting schema: extensions
+Linting schema: public
+
+No schema errors found
+WARN_EXIT=0
+################ db lint --level error --fail-on error ################
+Connecting to local database...
+Linting schema: extensions
+Linting schema: public
+
+No schema errors found
+ERR_EXIT=0

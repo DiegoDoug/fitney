@@ -1,0 +1,4 @@
+interface:
+  display_name: "Visual UI Design"
+  short_description: "Adaptive visual systems for real product needs"
+  default_prompt: "Use $visual-ui-design to turn my product and UX context into an adaptive visual design system."

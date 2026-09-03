@@ -1,0 +1,61 @@
+design_context:
+  product:
+    type: ""
+    purpose: ""
+    maturity: "concept|existing|redesign"
+  users:
+    primary: []
+    expertise: ""
+    accessibility_needs: []
+  tasks:
+    primary: []
+    frequency: ""
+    consequence: "low|medium|high"
+  platform:
+    targets: []
+    primary_form_factor: ""
+    input_modes: []
+    minimum_os_or_browser: ""
+  environment:
+    location: ""
+    lighting: ""
+    mobility: ""
+    connectivity: ""
+  content:
+    types: []
+    volume: ""
+    comparison_required: false
+  structure:
+    upstream_artifacts: []
+    approved_decisions: []
+    unresolved_decisions: []
+  brand:
+    attributes: []
+    required_assets: []
+    prohibited_treatments: []
+  technical:
+    stack: []
+    component_constraints: []
+  assumptions: []
+
+design_strategy:
+  design_read: ""
+  experience_qualities: []
+  anti_qualities: []
+  pressures:
+    high: []
+    medium: []
+    low: []
+  platform_system: ""
+  compliance_level: "native|adapted|inspired|custom"
+  primary_direction: ""
+  supporting_qualities: []
+  selected_principles: []
+  dials:
+    familiarity: "established|balanced|distinctive"
+    density: "spacious|balanced|compact"
+    expression: "quiet|branded|art-directed"
+    motion: "still|purposeful|choreographed"
+  signature_move: ""
+  restraint_rule: ""
+  generic_treatments_to_avoid: []

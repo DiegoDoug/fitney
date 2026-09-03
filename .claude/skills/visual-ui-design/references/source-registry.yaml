@@ -1,0 +1,111 @@
+# Curated routing registry. Verify live availability and current guidance before relying on time-sensitive claims.
+# authority: primary | design_system | research | observational | inspiration_only | implementation
+sources:
+  - {id: apple-design, name: Apple Design, url: "https://developer.apple.com/design/", authority: primary, categories: [apple, platform]}
+  - {id: apple-hig, name: Apple Human Interface Guidelines, url: "https://developer.apple.com/design/human-interface-guidelines/", authority: primary, categories: [apple, platform, components, accessibility]}
+  - {id: apple-resources, name: Apple Design Resources, url: "https://developer.apple.com/design/resources/", authority: primary, categories: [apple, ui-kits]}
+  - {id: sf-symbols, name: SF Symbols, url: "https://developer.apple.com/sf-symbols/", authority: primary, categories: [apple, icons]}
+  - {id: apple-fonts, name: Apple Fonts, url: "https://developer.apple.com/fonts/", authority: primary, categories: [apple, typography]}
+  - {id: apple-accessibility, name: Apple Accessibility, url: "https://developer.apple.com/accessibility/", authority: primary, categories: [apple, accessibility]}
+  - {id: apple-design-videos, name: Apple Design Videos, url: "https://developer.apple.com/videos/design/", authority: primary, categories: [apple, platform]}
+  - {id: material-3, name: Material Design 3, url: "https://m3.material.io/", authority: primary, categories: [android, platform, design-system]}
+  - {id: material-components, name: Material Components, url: "https://m3.material.io/components", authority: primary, categories: [android, components]}
+  - {id: material-foundations, name: Material Foundations, url: "https://m3.material.io/foundations", authority: primary, categories: [android, foundations]}
+  - {id: android-design, name: Android Design, url: "https://developer.android.com/design", authority: primary, categories: [android, platform]}
+  - {id: android-accessibility, name: Android Accessibility, url: "https://developer.android.com/guide/topics/ui/accessibility", authority: primary, categories: [android, accessibility]}
+  - {id: material-symbols, name: Material Symbols, url: "https://fonts.google.com/icons", authority: primary, categories: [android, icons]}
+  - {id: fluent-2, name: Fluent 2, url: "https://fluent2.microsoft.design/", authority: primary, categories: [windows, design-system]}
+  - {id: windows-design, name: Windows App Design, url: "https://learn.microsoft.com/windows/apps/design/", authority: primary, categories: [windows, platform]}
+  - {id: windows-accessibility, name: Windows Accessibility, url: "https://learn.microsoft.com/windows/apps/design/accessibility/accessibility", authority: primary, categories: [windows, accessibility]}
+  - {id: mdn, name: MDN Web Docs, url: "https://developer.mozilla.org/", authority: primary, categories: [web, standards]}
+  - {id: webdev, name: web.dev, url: "https://web.dev/", authority: primary, categories: [web, accessibility, performance]}
+  - {id: whatwg-html, name: WHATWG HTML, url: "https://html.spec.whatwg.org/", authority: primary, categories: [web, standards]}
+  - {id: open-ui, name: Open UI, url: "https://open-ui.org/", authority: primary, categories: [web, components]}
+  - {id: w3c-wai, name: W3C WAI, url: "https://www.w3.org/WAI/", authority: primary, categories: [accessibility]}
+  - {id: wcag, name: WCAG, url: "https://www.w3.org/WAI/standards-guidelines/wcag/", authority: primary, categories: [accessibility, standards]}
+  - {id: wcag-quickref, name: WCAG Quick Reference, url: "https://www.w3.org/WAI/WCAG22/quickref/", authority: primary, categories: [accessibility, checklist]}
+  - {id: aria-apg, name: ARIA Authoring Practices Guide, url: "https://www.w3.org/WAI/ARIA/apg/", authority: primary, categories: [accessibility, components]}
+  - {id: a11y-project, name: A11Y Project, url: "https://www.a11yproject.com/", authority: research, categories: [accessibility, practical]}
+  - {id: inclusive-components, name: Inclusive Components, url: "https://inclusive-components.design/", authority: research, categories: [accessibility, components]}
+  - {id: webaim, name: WebAIM, url: "https://webaim.org/", authority: research, categories: [accessibility]}
+  - {id: webaim-contrast, name: WebAIM Contrast Checker, url: "https://webaim.org/resources/contrastchecker/", authority: implementation, categories: [accessibility, color]}
+  - {id: ibm-carbon, name: IBM Carbon, url: "https://carbondesignsystem.com/", authority: design_system, categories: [enterprise, data, components]}
+  - {id: atlassian, name: Atlassian Design System, url: "https://atlassian.design/", authority: design_system, categories: [productivity, components]}
+  - {id: primer, name: GitHub Primer, url: "https://primer.style/", authority: design_system, categories: [developer-tools, components]}
+  - {id: spectrum, name: Adobe Spectrum, url: "https://spectrum.adobe.com/", authority: design_system, categories: [creative, components]}
+  - {id: polaris, name: Shopify Polaris, url: "https://polaris.shopify.com/", authority: design_system, categories: [commerce, admin]}
+  - {id: lightning, name: Salesforce Lightning, url: "https://www.lightningdesignsystem.com/", authority: design_system, categories: [enterprise, crm]}
+  - {id: ant-design, name: Ant Design, url: "https://ant.design/", authority: design_system, categories: [enterprise, data]}
+  - {id: elastic-ui, name: Elastic UI, url: "https://eui.elastic.co/", authority: design_system, categories: [observability, search, data]}
+  - {id: zendesk-garden, name: Zendesk Garden, url: "https://garden.zendesk.com/", authority: design_system, categories: [saas, support]}
+  - {id: base-web, name: Base Web, url: "https://baseweb.design/", authority: design_system, categories: [web, components]}
+  - {id: gitlab-pajamas, name: GitLab Pajamas, url: "https://design.gitlab.com/", authority: design_system, categories: [developer-tools, productivity]}
+  - {id: sap-fiori, name: SAP Fiori, url: "https://experience.sap.com/fiori-design-web/", authority: design_system, categories: [enterprise]}
+  - {id: oracle-redwood, name: Oracle Redwood, url: "https://redwood.oracle.com/", authority: design_system, categories: [enterprise]}
+  - {id: twilio-paste, name: Twilio Paste, url: "https://paste.twilio.design/", authority: design_system, categories: [saas, communications]}
+  - {id: uswds, name: U.S. Web Design System, url: "https://designsystem.digital.gov/", authority: design_system, categories: [government, accessibility]}
+  - {id: govuk-design, name: GOV.UK Design System, url: "https://design-system.service.gov.uk/", authority: design_system, categories: [government, forms, accessibility]}
+  - {id: govuk-service, name: GOV.UK Service Manual, url: "https://www.gov.uk/service-manual", authority: research, categories: [government, service-design]}
+  - {id: australia-design, name: Australian Government Design System, url: "https://designsystem.gov.au/", authority: design_system, categories: [government]}
+  - {id: canada-design, name: Canada Design System, url: "https://design.canada.ca/", authority: design_system, categories: [government]}
+  - {id: ontario-design, name: Ontario Design System, url: "https://designsystem.ontario.ca/", authority: design_system, categories: [government]}
+  - {id: nhs-service, name: NHS Digital Service Manual, url: "https://service-manual.nhs.uk/", authority: design_system, categories: [health, government, accessibility]}
+  - {id: va-design, name: VA Design System, url: "https://design.va.gov/", authority: design_system, categories: [government, health]}
+  - {id: nng, name: Nielsen Norman Group, url: "https://www.nngroup.com/articles/", authority: research, categories: [ux, usability]}
+  - {id: baymard, name: Baymard Institute, url: "https://baymard.com/", authority: research, categories: [commerce, ux]}
+  - {id: laws-of-ux, name: Laws of UX, url: "https://lawsofux.com/", authority: research, categories: [psychology, principles]}
+  - {id: interaction-design, name: Interaction Design Foundation, url: "https://www.interaction-design.org/literature", authority: research, categories: [hci, ux]}
+  - {id: measuringu, name: MeasuringU, url: "https://measuringu.com/", authority: research, categories: [metrics, ux]}
+  - {id: alistapart, name: A List Apart, url: "https://alistapart.com/", authority: research, categories: [web, design]}
+  - {id: smashing, name: Smashing Magazine, url: "https://www.smashingmagazine.com/", authority: research, categories: [web, ui]}
+  - {id: mobbin, name: Mobbin, url: "https://mobbin.com/", authority: observational, categories: [mobile, web, patterns]}
+  - {id: pageflows, name: Page Flows, url: "https://pageflows.com/", authority: observational, categories: [flows, patterns]}
+  - {id: refero, name: Refero, url: "https://refero.design/", authority: observational, categories: [screens, patterns]}
+  - {id: screenlane, name: Screenlane, url: "https://screenlane.com/", authority: observational, categories: [mobile, patterns]}
+  - {id: nicelydone, name: Nicelydone, url: "https://nicelydone.club/", authority: observational, categories: [saas, patterns]}
+  - {id: saasframe, name: SaaSFrame, url: "https://www.saasframe.io/", authority: observational, categories: [saas, patterns]}
+  - {id: ui-sources, name: UI Sources, url: "https://www.uisources.com/", authority: observational, categories: [interaction, patterns]}
+  - {id: uxarchive, name: UXArchive, url: "https://uxarchive.com/", authority: observational, categories: [mobile, flows]}
+  - {id: checklist-design, name: Checklist Design, url: "https://www.checklist.design/", authority: observational, categories: [states, screens]}
+  - {id: behance, name: Behance, url: "https://www.behance.net/", authority: inspiration_only, categories: [visual-inspiration]}
+  - {id: dribbble, name: Dribbble, url: "https://dribbble.com/", authority: inspiration_only, categories: [visual-inspiration]}
+  - {id: awwwards, name: Awwwards, url: "https://www.awwwards.com/", authority: inspiration_only, categories: [web-inspiration]}
+  - {id: landbook, name: Land-book, url: "https://land-book.com/", authority: inspiration_only, categories: [web-inspiration]}
+  - {id: godly, name: Godly, url: "https://godly.website/", authority: inspiration_only, categories: [web-inspiration]}
+  - {id: siteinspire, name: SiteInspire, url: "https://www.siteinspire.com/", authority: inspiration_only, categories: [web-inspiration]}
+  - {id: lapa-ninja, name: Lapa Ninja, url: "https://www.lapa.ninja/", authority: inspiration_only, categories: [landing-pages]}
+  - {id: one-page-love, name: One Page Love, url: "https://onepagelove.com/", authority: inspiration_only, categories: [landing-pages]}
+  - {id: google-fonts, name: Google Fonts, url: "https://fonts.google.com/", authority: implementation, categories: [typography]}
+  - {id: fontshare, name: Fontshare, url: "https://www.fontshare.com/", authority: implementation, categories: [typography]}
+  - {id: fontsource, name: Fontsource, url: "https://fontsource.org/", authority: implementation, categories: [typography]}
+  - {id: typewolf, name: Typewolf, url: "https://www.typewolf.com/", authority: observational, categories: [typography]}
+  - {id: fonts-in-use, name: Fonts In Use, url: "https://fontsinuse.com/", authority: observational, categories: [typography]}
+  - {id: practical-typography, name: Practical Typography, url: "https://practicaltypography.com/", authority: research, categories: [typography]}
+  - {id: adobe-color, name: Adobe Color, url: "https://color.adobe.com/", authority: implementation, categories: [color]}
+  - {id: coolors, name: Coolors, url: "https://coolors.co/", authority: implementation, categories: [color]}
+  - {id: leonardo, name: Leonardo, url: "https://leonardocolor.io/", authority: implementation, categories: [color, accessibility]}
+  - {id: radix-colors, name: Radix Colors, url: "https://www.radix-ui.com/colors", authority: implementation, categories: [color]}
+  - {id: colorbrewer, name: ColorBrewer, url: "https://colorbrewer2.org/", authority: research, categories: [data-visualization, color]}
+  - {id: oklch, name: OKLCH Color Picker, url: "https://oklch.com/", authority: implementation, categories: [color]}
+  - {id: lucide, name: Lucide, url: "https://lucide.dev/", authority: implementation, categories: [icons]}
+  - {id: heroicons, name: Heroicons, url: "https://heroicons.com/", authority: implementation, categories: [icons]}
+  - {id: phosphor, name: Phosphor Icons, url: "https://phosphoricons.com/", authority: implementation, categories: [icons]}
+  - {id: tabler-icons, name: Tabler Icons, url: "https://tabler.io/icons", authority: implementation, categories: [icons]}
+  - {id: design-tokens, name: Design Tokens Community Group, url: "https://www.designtokens.org/", authority: primary, categories: [tokens, standards]}
+  - {id: style-dictionary, name: Style Dictionary, url: "https://styledictionary.com/", authority: implementation, categories: [tokens]}
+  - {id: storybook, name: Storybook, url: "https://storybook.js.org/", authority: implementation, categories: [components, documentation]}
+  - {id: atomic-design, name: Atomic Design, url: "https://atomicdesign.bradfrost.com/", authority: research, categories: [systems, components]}
+  - {id: radix-ui, name: Radix UI, url: "https://www.radix-ui.com/", authority: implementation, categories: [components, accessibility]}
+  - {id: react-aria, name: React Aria, url: "https://react-spectrum.adobe.com/react-aria/", authority: implementation, categories: [components, accessibility]}
+  - {id: base-ui, name: Base UI, url: "https://base-ui.com/", authority: implementation, categories: [components]}
+  - {id: headless-ui, name: Headless UI, url: "https://headlessui.com/", authority: implementation, categories: [components]}
+  - {id: shadcn-ui, name: shadcn/ui, url: "https://ui.shadcn.com/", authority: implementation, categories: [components]}
+  - {id: datawrapper, name: Datawrapper Blog, url: "https://blog.datawrapper.de/", authority: research, categories: [data-visualization]}
+  - {id: observable-plot, name: Observable Plot, url: "https://observablehq.com/plot/", authority: implementation, categories: [data-visualization]}
+  - {id: d3, name: D3, url: "https://d3js.org/", authority: implementation, categories: [data-visualization]}
+  - {id: vega-lite, name: Vega-Lite, url: "https://vega.github.io/vega-lite/", authority: implementation, categories: [data-visualization]}
+  - {id: ft-visual-vocabulary, name: FT Visual Vocabulary, url: "https://ft-interactive.github.io/visual-vocabulary/", authority: research, categories: [data-visualization]}
+  - {id: material-motion, name: Material Motion, url: "https://m3.material.io/styles/motion/overview", authority: primary, categories: [motion, android]}
+  - {id: apple-motion, name: Apple HIG Motion, url: "https://developer.apple.com/design/human-interface-guidelines/motion", authority: primary, categories: [motion, apple]}
+  - {id: motion-dev, name: Motion, url: "https://motion.dev/", authority: implementation, categories: [motion, web]}
+  - {id: rive, name: Rive, url: "https://rive.app/", authority: implementation, categories: [motion]}

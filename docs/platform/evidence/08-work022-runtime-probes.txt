@@ -1,0 +1,130 @@
+==================================================================
+PROBE 1 - F-5: record a set on a COMPLETED session -> recompute runs
+==================================================================
+BEGIN
+INSERT 0 1
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "f0000000-0000-4000-8000-00000000000f", "role" : "authenticated"}
+(1 row)
+
+  set_config   
+---------------
+ authenticated
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+  -> performed_sets INSERT on a completed session: OK (no _week_start_for error)
+    category    |  value   | formula_id 
+----------------+----------+------------
+ max_load       |      100 | 
+ est_1rm        | 116.6667 | epley
+ rep_pr         |      100 | 
+ session_volume | 500.0000 | 
+(4 rows)
+
+ week_start_date | working_sets | total_volume_kg 
+-----------------+--------------+-----------------
+ 2026-08-31      |            1 |             500
+(1 row)
+
+  -> UPDATE performed_set (recompute fires again, idempotent)
+UPDATE 1
+ category |  value   
+----------+----------
+ est_1rm  | 120.0000
+(1 row)
+
+  -> UPDATE workout_sessions status/ended_at/deleted_at (trg_session_recompute)
+UPDATE 1
+UPDATE 1
+  -> all session mutations OK
+ROLLBACK
+
+==================================================================
+PROBE 2 - F-5 across configured first-day-of-week (week_start 0=Sun..6=Sat)
+==================================================================
+BEGIN
+INSERT 0 1
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "f4000000-0000-4000-8000-00000000000f", "role" : "authenticated"}
+(1 row)
+
+  set_config   
+---------------
+ authenticated
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+                 note                  | week_start_date 
+---------------------------------------+-----------------
+ week_start=0 (Sun): expect 2026-08-30 | 2026-08-30
+(1 row)
+
+             note              | sun_start  | mon_start  | wed_start  | sat_start  
+-------------------------------+------------+------------+------------+------------
+ direct _week_start_for checks | 2026-08-30 | 2026-08-31 | 2026-09-02 | 2026-08-29
+(1 row)
+
+ROLLBACK
+
+==================================================================
+PROBE 3 - sync_apply full-payload -> applied ; partial -> rejected (no raw exception, no row)
+==================================================================
+BEGIN
+INSERT 0 1
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "f8000000-0000-4000-8000-00000000000f", "role" : "authenticated"}
+(1 row)
+
+  set_config   
+---------------
+ authenticated
+(1 row)
+
+INSERT 0 1
+     case     |               result                
+--------------+-------------------------------------
+ full payload | {"status": "applied", "version": 1}
+(1 row)
+
+              case              |                result                 
+--------------------------------+---------------------------------------
+ replay same op_id -> duplicate | {"status": "duplicate", "version": 1}
+(1 row)
+
+            case             |         result         
+-----------------------------+------------------------
+ partial payload -> rejected | {"status": "rejected"}
+(1 row)
+
+                  check                  | count 
+-----------------------------------------+-------
+ no row created for the rejected partial |     0
+(1 row)
+
+             check              
+--------------------------------
+ anon cannot execute sync_apply
+(1 row)
+
+    set_config     
+-------------------
+ {"role" : "anon"}
+(1 row)
+
+ set_config 
+------------
+ anon
+(1 row)
+
+ERROR:  permission denied for function sync_apply
+ROLLBACK

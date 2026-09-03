@@ -1,0 +1,15 @@
+# Architecture Decision Records — Weight
+
+Consequential, reversible architecture decisions from phase 4 (`software-architecture`). Smaller choices live in `docs/architecture/system-architecture.md`. Status: all **Proposed** pending phase-4 human approval; on approval they become **Accepted** and are referenced by ID in `development-roadmap.md`.
+
+| ADR | Decision | Reversibility |
+|---|---|---|
+| [0001](ADR-0001-local-first-system-of-record.md) | SQLite is the on-device system of record; every domain mutation writes the row(s) + a `sync_outbox` entry in one transaction | Medium–low |
+| [0002](ADR-0002-layered-dependency-rule.md) | Enforced layered dependency rule (app → features → domain/services/repository-interfaces → local/sync → remote gateway), with a failing CI boundary check | High (tooling) / low (layer shape) |
+| [0003](ADR-0003-sync-engine.md) | Sync = transactional outbox (stable `operation_id`, coalesced latest state; durable **`dispatched`** state that only a terminal result — `applied`/`duplicate`/`conflict` — removes, so transport failure never spawns a second `pending` row; `pending` successor + successor-aware terminal acknowledgement; completed-session conflicts parked, not re-issued) + **server-`version` optimistic concurrency** (insert-if-absent / update-if-`base_version` / atomic increment / conflict-not-overwrite) + **hybrid pull**: composite `(updated_at, id)` incremental cursor for latency **plus** periodic full `(id, version)` reconciliation for completeness (covers late transaction commits) + tombstones + clock-independent conflict resolution with preserved `sync_conflicts` copies; no CRDT / replication lib / realtime / server change-feed in MVP | Medium |
+| [0004](ADR-0004-identifiers-and-time.md) | Client-generated UUID (v7 preferred, v4 fallback) PKs; UTC instants + separate IANA session timezone + date-only plan dates; canonical kg/m/s | High (generator) |
+| [0005](ADR-0005-derived-data-recompute.md) | PRs/aggregates via deterministic pure recompute, materialized locally, idempotent, `formula_version`-stamped; server mirrors the logic and wins on pull | Medium |
+| [0006](ADR-0006-local-schema-and-migrations.md) | Local schema mirrors Postgres + 3 local-only tables; forward-only numbered migrations with a runner; client/server lockstep via shared entity defs | Low (existing rows) |
+| [0007](ADR-0007-client-state-and-data-access.md) | React/Context for UI, one small Zustand store for ephemeral session UI only; domain data read from SQLite via a thin `useDbQuery`; no TanStack Query against Supabase | High |
+| [0008](ADR-0008-boundary-validation.md) | Runtime schema validation (Zod/valibot) at the `data/remote` gateway and repository inputs; hand-authored domain types; generated Supabase types confined to `data/remote` | High |
+| [0009](ADR-0009-authorization-and-identity-posture.md) | Authorization is RLS-enforced only; tokens in `expo-secure-store`; per-user local DB; `userId`-scoped repos/sync; guest mode deferred behind an `AuthProvider` seam | High (seams) |
