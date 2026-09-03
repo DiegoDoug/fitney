@@ -1,8 +1,8 @@
 ---
 notion_page_id: "3cfe6070-43bc-8046-b281-eb56b92335af"
 notion_url: "https://app.notion.com/p/Fitney-3cfe607043bc8046b281eb56b92335af"
-last_edited: "2026-09-03T02:49:00.000Z"
-generated_at: "2026-09-03T02:49:48.572Z"
+last_edited: "2026-09-03T04:29:00.000Z"
+generated_at: "2026-09-03T04:29:27.702Z"
 generator: "notion-project-memory-bridge@0.1.0"
 ---
 
@@ -14,8 +14,8 @@ Generated from the canonical Notion Shared Project Memory workspace. **Do not ed
 
 - **Status:** In progress
 - **Stage:** Build
-- **Current focus:** Phase 8 (platform-release) AWAITING APPROVAL. WORK-022 lifecycle recovery COMPLETE 2026-09-02: first local execution of the authored data/security layer (local Supabase, Postgres 15.8) surfaced 12 defects (F-1..F-12; F-5 & F-9 High — both broke the recompute path at runtime; inspection had missed all of them). Human-authorised narrow recovery across security-identity (migration 0006: F-2/F-5/F-8/F-11) + backend-data-engineering (migration 0003: F-7/F-9) + pgTAP suites (F-1/F-3/F-4/F-6/F-10/F-12) fixed everything in place (migrations unshipped). Re-verified: supabase db reset x2 clean, supabase db lint clean (warning + error), supabase test db = PASS 68/68, runtime probes green. SEC-RESID-2 resolved; db-verify CI gate added. NEXT: (1) human authorises hosted DEP-1 (dev + prod Supabase projects) + git init/GitHub repo; (2) platform-release re-runs db reset/test db/db lint on the hosted project against the real role model + wires the CI gate green; (3) client-TS <-> server recompute golden-vector cross-run (WORK-020); (4) ISS-27 decision (anon read of seed catalogue). Phases 6 & 7 stay NOT approved (DEC-3: zero hosted-executed tests); client-engineering stays LOCKED.
-- **GitHub:** —
+- **Current focus:** Phase 8 (platform-release) AWAITING APPROVAL — execution-evidence gate now SATISFIED. Human 2026-09-03: 'APPROVED - dev-only gate'; ISS-27 resolved to authenticated-only catalogue; git + one hosted fitney-dev project authorised; production deferred; WORK-020 -> phase 5 acceptance condition. Done this pass: git initialised -> github.com/DiegoDoug/fitney (private); db-verify GitHub Actions gate GREEN on main (68/68); hosted fitney-dev (Supabase, Postgres 17, MetaTrack org, $0/mo) provisioned + migrations applied + db lint --linked clean + Supabase security advisor clean (bar 1 intentional INFO) + 31 hosted behavioural checks 31/0 on the real authenticated/anon/service_role roles. 15 defects surfaced across phase-8 execution (F-1..F-14 + ISS-27) all fixed in place under WORK-022 while migrations were unshipped. Local supabase test db = 68/68. NEXT: human approval of phase 8 (and phase 7) -> then client-engineering unlocks. Deferred human steps: production Supabase project, hosted auth hardening (SEC-C2), supabase secrets set + Edge Function deploy, branch protection requiring db-verify. Open: ISS-28 (PG17 vs BD-DEC-01 PG15 — backend to ratify).
+- **GitHub:** https://github.com/DiegoDoug/fitney
 
 ## Decisions
 
@@ -157,7 +157,7 @@ Generated from the canonical Notion Shared Project Memory workspace. **Do not ed
 
 ## Open Issues
 
-- [ISS-27 — F-10 / ISS-27: should the anon key expose the global seed-exercise catalogue?](./issues/iss-27-f-10-iss-27-should-the-anon-key-expose-the-global-seed-exercise-catalo.md) — **Decision Needed**
+- [ISS-28 — ISS-28: hosted + local + CI are Postgres 17, not the Postgres 15 assumed by BD-DEC-01](./issues/iss-28-iss-28-hosted-local-ci-are-postgres-17-not-the-postgres-15-assumed-by-.md) — **Decision Needed**
 - [ISS-19 — AR-OQ-1–4: Architecture open questions (UUIDv7, Zod vs valibot, recompute form, reactive query layer)](./issues/iss-19-ar-oq-1-4-architecture-open-questions-uuidv7-zod-vs-valibot-recompute-.md) — **Open**
 - [ISS-20 — BD-OQ-3–4: Backend optimisation / retention questions (sync_apply batching; processed_operations pruning)](./issues/iss-20-bd-oq-3-4-backend-optimisation-retention-questions-sync-apply-batching.md) — **Open**
 - [ISS-22 — Accessibility / visual-verification risk: monochrome + neumorphic system and unverified-on-device visual design](./issues/iss-22-accessibility-visual-verification-risk-monochrome-neumorphic-system-an.md) — **Open**
@@ -175,14 +175,13 @@ Generated from the canonical Notion Shared Project Memory workspace. **Do not ed
 - [ISS-13 — OQ-7 / AR-OQ-5 / UX-OQ-6: Multi-device simultaneous-edit conflict review UX](./issues/iss-13-oq-7-ar-oq-5-ux-oq-6-multi-device-simultaneous-edit-conflict-review-ux.md) — **Open**
 - [ISS-16 — DEP-5: EAS build / distribution, app signing, and store accounts not set up](./issues/iss-16-dep-5-eas-build-distribution-app-signing-and-store-accounts-not-set-up.md) — **Open**
 - [ISS-6 — SEC-OQ-1: data-retention / backup / PITR policy for non-deleted data is unspecified](./issues/iss-6-sec-oq-1-data-retention-backup-pitr-policy-for-non-deleted-data-is-uns.md) — **Decision Needed**
-- [ISS-1 — DEP-1: no Supabase project provisioned — blocks all backend/security execution & verification](./issues/iss-1-dep-1-no-supabase-project-provisioned-blocks-all-backend-security-exec.md) — **Investigating**
 - [ISS-4 — SEC-RESID-1: delete-account re-auth is a 300s freshness heuristic, not nonce-based reauthentication](./issues/iss-4-sec-resid-1-delete-account-re-auth-is-a-300s-freshness-heuristic-not-n.md) — **Open**
 - [ISS-7 — BD-OQ-1: corrected weekly-aggregate bucketing needs backend validation against golden vectors](./issues/iss-7-bd-oq-1-corrected-weekly-aggregate-bucketing-needs-backend-validation-.md) — **Open**
 
 ## Roadmap
 
 - [REL-16 — MVP release](./milestones/rel-16-mvp-release.md) — **Planned**
-- [REL-12 — Gate — DEP-1 execution gate (migrations + pgTAP + lint green on a provisioned Supabase project)](./milestones/rel-12-gate-dep-1-execution-gate-migrations-pgtap-lint-green-on-a-provisioned.md) — **Blocked**
+- [REL-12 — Gate — DEP-1 execution gate (migrations + pgTAP + lint green on a provisioned Supabase project)](./milestones/rel-12-gate-dep-1-execution-gate-migrations-pgtap-lint-green-on-a-provisioned.md) — **Ready for Review**
 - [REL-14 — Gate — Sync-protocol conformance suite (against real Supabase)](./milestones/rel-14-gate-sync-protocol-conformance-suite-against-real-supabase.md) — **Planned**
 - [REL-13 — Gate — Dependency-boundary lint CI gate](./milestones/rel-13-gate-dependency-boundary-lint-ci-gate.md) — **Planned**
 - [REL-15 — Gate — Pre-beta security gate](./milestones/rel-15-gate-pre-beta-security-gate.md) — **Planned**

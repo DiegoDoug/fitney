@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-03T02:49:48.592Z",
+  "generated_at": "2026-09-03T04:29:27.715Z",
   "project": {
     "id": "3cfe6070-43bc-8046-b281-eb56b92335af",
     "name": "Fitney",
@@ -10,10 +10,10 @@
     "decisions": 49,
     "adrs": 9,
     "requirements": 71,
-    "issues": 27,
+    "issues": 28,
     "tasks": 6,
     "milestones": 16,
-    "reviews": 8,
+    "reviews": 9,
     "handoffs": 2
   },
   "generated_by": "notion-project-memory-bridge@0.1.0"

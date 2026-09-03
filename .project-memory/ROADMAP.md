@@ -1,7 +1,7 @@
 # Roadmap
 
 - **MVP release** — Release — Planned — ? → ?
-- **Gate — DEP-1 execution gate (migrations + pgTAP + lint green on a provisioned Supabase project)** — Gate — Blocked — ? → ?
+- **Gate — DEP-1 execution gate (migrations + pgTAP + lint green on a provisioned Supabase project)** — Gate — Ready for Review — ? → ?
 - **Gate — Sync-protocol conformance suite (against real Supabase)** — Gate — Planned — ? → ?
 - **Gate — Dependency-boundary lint CI gate** — Gate — Planned — ? → ?
 - **Gate — Pre-beta security gate** — Gate — Planned — ? → ?

@@ -1,7 +1,7 @@
 ---
 notion_page_id: "3cfe6070-43bc-8046-b281-eb56b92335af"
 notion_url: "https://app.notion.com/p/Fitney-3cfe607043bc8046b281eb56b92335af"
-last_edited: "2026-09-03T02:49:00.000Z"
+last_edited: "2026-09-03T04:29:00.000Z"
 ---
 
 # Fitney
@@ -18,8 +18,8 @@ Build
 
 ## Current Focus
 
-Phase 8 (platform-release) AWAITING APPROVAL. WORK-022 lifecycle recovery COMPLETE 2026-09-02: first local execution of the authored data/security layer (local Supabase, Postgres 15.8) surfaced 12 defects (F-1..F-12; F-5 & F-9 High — both broke the recompute path at runtime; inspection had missed all of them). Human-authorised narrow recovery across security-identity (migration 0006: F-2/F-5/F-8/F-11) + backend-data-engineering (migration 0003: F-7/F-9) + pgTAP suites (F-1/F-3/F-4/F-6/F-10/F-12) fixed everything in place (migrations unshipped). Re-verified: supabase db reset x2 clean, supabase db lint clean (warning + error), supabase test db = PASS 68/68, runtime probes green. SEC-RESID-2 resolved; db-verify CI gate added. NEXT: (1) human authorises hosted DEP-1 (dev + prod Supabase projects) + git init/GitHub repo; (2) platform-release re-runs db reset/test db/db lint on the hosted project against the real role model + wires the CI gate green; (3) client-TS <-> server recompute golden-vector cross-run (WORK-020); (4) ISS-27 decision (anon read of seed catalogue). Phases 6 & 7 stay NOT approved (DEC-3: zero hosted-executed tests); client-engineering stays LOCKED.
+Phase 8 (platform-release) AWAITING APPROVAL — execution-evidence gate now SATISFIED. Human 2026-09-03: 'APPROVED - dev-only gate'; ISS-27 resolved to authenticated-only catalogue; git + one hosted fitney-dev project authorised; production deferred; WORK-020 -> phase 5 acceptance condition. Done this pass: git initialised -> github.com/DiegoDoug/fitney (private); db-verify GitHub Actions gate GREEN on main (68/68); hosted fitney-dev (Supabase, Postgres 17, MetaTrack org, $0/mo) provisioned + migrations applied + db lint --linked clean + Supabase security advisor clean (bar 1 intentional INFO) + 31 hosted behavioural checks 31/0 on the real authenticated/anon/service_role roles. 15 defects surfaced across phase-8 execution (F-1..F-14 + ISS-27) all fixed in place under WORK-022 while migrations were unshipped. Local supabase test db = 68/68. NEXT: human approval of phase 8 (and phase 7) -> then client-engineering unlocks. Deferred human steps: production Supabase project, hosted auth hardening (SEC-C2), supabase secrets set + Edge Function deploy, branch protection requiring db-verify. Open: ISS-28 (PG17 vs BD-DEC-01 PG15 — backend to ratify).
 
 ## Repository
 
-—
+https://github.com/DiegoDoug/fitney

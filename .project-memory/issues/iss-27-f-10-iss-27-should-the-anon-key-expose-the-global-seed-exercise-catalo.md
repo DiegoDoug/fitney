@@ -5,8 +5,8 @@ title: "F-10 / ISS-27: should the anon key expose the global seed-exercise catal
 notion_page_id: "3d0e6070-43bc-81aa-8248-cd431be359d1"
 notion_url: "https://app.notion.com/p/F-10-ISS-27-should-the-anon-key-expose-the-global-seed-exercise-catalogue-3d0e607043bc81aa8248cd431be359d1"
 created: "2026-09-03T02:47:00.000Z"
-last_edited: "2026-09-03T02:47:00.000Z"
-status: "Decision Needed"
+last_edited: "2026-09-03T04:26:00.000Z"
+status: "Resolved"
 ---
 
 # F-10 / ISS-27: should the anon key expose the global seed-exercise catalogue?
@@ -29,4 +29,4 @@ supabase/migrations/20260902090005_rls.sql (exercise_select); SEC-DEC-05; docs/s
 
 ## Proposed Resolution
 
-security-identity to decide: (A) keep as-is — the seed catalogue is intentionally world-readable (aligns with SEC-DEC-05; zero client impact since there is no anon flow); or (B) tighten — add a role guard so exercise_select applies TO authenticated only (defence-in-depth; matches 'the app has no anon path'). Non-blocking for MVP build; decide before beta and reflect in the privacy posture.
+RESOLVED 2026-09-03 by human decision: the exercise catalogue (global seed + private) is AUTHENTICATED-ONLY. Implemented in migration 20260902090006 — exercise_select recreated TO authenticated using (owner_user_id is null or owner_user_id = auth.uid()). This refines the READ half of SEC-DEC-05 ("global … readable by everyone" -> "readable by every authenticated user"); the write model is unchanged. Verified on hosted fitney-dev (PG17): an anon session sees 0 exercises; an authenticated session reads the 8 global seed rows. Also verified locally (supabase test db 68/68) and in CI. tests/04 anon assertion restored to "anon sees no exercises at all". Tracked as SEC-RESID-9 (now Closed) in docs/security/security-identity.md §9.

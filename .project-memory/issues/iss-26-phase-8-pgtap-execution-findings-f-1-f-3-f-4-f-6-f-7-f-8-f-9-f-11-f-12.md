@@ -1,15 +1,15 @@
 ---
 id: "ISS-26"
 kind: "issue"
-title: "Phase 8 pgTAP / execution findings (F-1, F-3, F-4, F-6, F-7, F-8, F-9, F-11, F-12) — RESOLVED (WORK-022)"
+title: "Phase 8 pgTAP / execution findings (F-1, F-3, F-4, F-6, F-7, F-8, F-9, F-11, F-12, F-13, F-14) — RESOLVED (WORK-022)"
 notion_page_id: "3cfe6070-43bc-81fd-912a-fade9b78676e"
-notion_url: "https://app.notion.com/p/Phase-8-pgTAP-execution-findings-F-1-F-3-F-4-F-6-F-7-F-8-F-9-F-11-F-12-RESOLVED-WORK--3cfe607043bc81fd912afade9b78676e"
+notion_url: "https://app.notion.com/p/Phase-8-pgTAP-execution-findings-F-1-F-3-F-4-F-6-F-7-F-8-F-9-F-11-F-12-F-13-F-14-RES-3cfe607043bc81fd912afade9b78676e"
 created: "2026-09-02T23:40:00.000Z"
-last_edited: "2026-09-03T02:47:00.000Z"
+last_edited: "2026-09-03T04:27:00.000Z"
 status: "Resolved"
 ---
 
-# Phase 8 pgTAP / execution findings (F-1, F-3, F-4, F-6, F-7, F-8, F-9, F-11, F-12) — RESOLVED (WORK-022)
+# Phase 8 pgTAP / execution findings (F-1, F-3, F-4, F-6, F-7, F-8, F-9, F-11, F-12, F-13, F-14) — RESOLVED (WORK-022)
 
 ## Summary
 
@@ -29,4 +29,4 @@ docs/platform/platform-release.md §13; docs/platform/evidence/03-supabase-test-
 
 ## Proposed Resolution
 
-RESOLVED 2026-09-02 under WORK-022. F-1: perform->select at top-level SQL scope (12 statements across all 4 suites), ratified line-by-line; perform inside PL/pgSQL bodies preserved. F-3/F-4: throws_ok replaced with explicit "0 rows affected" + "protected row unchanged" assertions in tests/01 and tests/04 (RLS filters a forbidden UPDATE to 0 rows silently; it does not raise). F-6: plans corrected to the exact executed counts (01=19, 02=17, 03=8, 04=24) — this also fixed pre-existing miscounts in suites 02 and 04. F-7: v_keep uuid[] := array[]::uuid[] in migration 0003 -> supabase db lint --level warning is now clean. Additional defects surfaced once the suites ran end-to-end and fixed in the same recovery: F-8 (sync_apply dedupe returned the stored 'applied' instead of the documented 'duplicate' -> now returns 'duplicate'); F-9 (uuid-ossp lives in the extensions schema; the pinned search_path could not resolve uuid_generate_v5/uuid_ns_url -> schema-qualified in _pr_id/_agg_id, search_path unchanged); F-11 (anon had EXECUTE on sync_apply via Supabase default privileges -> revoke ... from public, anon); F-12 (tests/03 compared numeric columns to bare integer literals -> ::numeric casts). Result: supabase test db = PASS 68/68, all suites reach finish() with exact plans; db lint clean at warning + error. Evidence: docs/platform/evidence/05-08; docs/security/security-identity.md §8.1. F-10 (anon read of the global seed catalogue) is tracked separately as ISS-27 (open question).
+RESOLVED 2026-09-02/03 under WORK-022. Local-execution findings F-1/F-3/F-4/F-6/F-7/F-8/F-9/F-11/F-12 fixed and re-verified (see earlier note). HOSTED execution against fitney-dev (PG17) + the Supabase security advisor surfaced two more, also fixed: F-13 — recompute_ / trg_recompute_ / check_ref_ownership / _guard_exercise_owner (SECURITY DEFINER, public schema) were EXECUTE-able by anon+authenticated via /rest/v1/rpc, so a caller could invoke recompute*(<any user_id>, ...); same Supabase ALTER DEFAULT PRIVILEGES gap as F-11. Fix: migration 0006 revoke all on function ... from public, anon, authenticated on all 13 internal/helper/trigger/definer functions (triggers still fire — invocation does not check EXECUTE); tests/03 rewritten to verify the trigger-driven recompute + idempotency instead of a direct call. F-14 — set_row_metadata / _attach_row_metadata had a mutable search_path (advisor 0011); fix: set search_path = pg_catalog, public in migration 0001. Supabase security advisor re-run after the fixes: clean except one intentional INFO (deletion_receipts RLS-enabled-no-policy = service_role-only by design). Result across all surfaces: local supabase test db 68/68, db-verify CI green on main, hosted db lint --linked clean + 31 behavioural checks 31/0.

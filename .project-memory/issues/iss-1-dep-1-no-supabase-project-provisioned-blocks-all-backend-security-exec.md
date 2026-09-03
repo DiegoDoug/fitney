@@ -5,8 +5,8 @@ title: "DEP-1: no Supabase project provisioned — blocks all backend/security e
 notion_page_id: "3cfe6070-43bc-81a4-8428-df5f6474de17"
 notion_url: "https://app.notion.com/p/DEP-1-no-Supabase-project-provisioned-blocks-all-backend-security-execution-verification-3cfe607043bc81a48428df5f6474de17"
 created: "2026-09-02T17:34:00.000Z"
-last_edited: "2026-09-02T23:41:00.000Z"
-status: "Investigating"
+last_edited: "2026-09-03T04:26:00.000Z"
+status: "Resolved"
 ---
 
 # DEP-1: no Supabase project provisioned — blocks all backend/security execution & verification
@@ -29,4 +29,4 @@ development-roadmap.md DEP-1, WORK-015/018, BD-RISK-1, SEC-RISK-1, SEC-C1, BD-C1
 
 ## Proposed Resolution
 
-PARTIAL 2026-09-02 (platform-release phase 8): a LOCAL Supabase environment is now provisioned and verified on the target Postgres 15.8 (Supabase CLI 2.67.1 + Docker). supabase db reset applies migrations 0001–0006 + seed cleanly and repeatably; supabase db lint --fail-on error passes (1 warning). supabase test db FAILS — execution found F-5 (High) and F-2 (Medium) code defects (new issues), so phases 6/7 are still NOT verified and client-engineering stays LOCKED. STILL BLOCKED: (a) no HOSTED Supabase project for Weight/Fitney (supabase projects list shows only unrelated projects) — creating dev + prod projects is a human decision (pick org, authorize); (b) no git repository — the db-verify CI merge gate cannot run and branch protection cannot be set until git init + a GitHub repo exist. See docs/platform/platform-release.md §12–§15.
+RESOLVED (DEV) 2026-09-03. Hosted development Supabase project fitney-dev provisioned (ref oaubwbvoaydveguqjovq, MetaTrack org, Postgres 17, $0/month free tier) after the human authorised git + one dev project. Migrations 0001–0006 + seed applied cleanly (supabase db push + db reset --linked); db lint --linked clean; Supabase security advisor clean except one intentional INFO (deletion_receipts). 31 hosted behavioural checks on the real authenticated/anon/service_role roles = 31/0 (RLS isolation, sync_apply, recompute + golden vectors, service_role BYPASSRLS, ISS-27, F-11/F-13). Local stack + db-verify GitHub Actions gate also green (github.com/DiegoDoug/fitney). The backend/security execution & verification that this issue blocked is now unblocked for dev. PRODUCTION Supabase project + hosted auth hardening + supabase secrets set + Edge Function deploy remain a deferred human step (tracked in platform-release C-2 / TASK-4). Publishable/anon key in the git-ignored .env; no service-role key stored anywhere in the repo.

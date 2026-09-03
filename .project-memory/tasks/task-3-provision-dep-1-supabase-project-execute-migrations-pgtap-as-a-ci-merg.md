@@ -5,8 +5,8 @@ title: "Provision DEP-1 (Supabase project) + execute migrations & pgTAP as a CI 
 notion_page_id: "3cfe6070-43bc-81e6-a979-d0f7472510ac"
 notion_url: "https://app.notion.com/p/Provision-DEP-1-Supabase-project-execute-migrations-pgTAP-as-a-CI-merge-gate-3cfe607043bc81e6a979d0f7472510ac"
 created: "2026-09-02T17:34:00.000Z"
-last_edited: "2026-09-02T22:18:00.000Z"
-status: "In Progress"
+last_edited: "2026-09-03T04:27:00.000Z"
+status: "Review"
 ---
 
 # Provision DEP-1 (Supabase project) + execute migrations & pgTAP as a CI merge gate
@@ -25,8 +25,8 @@ Claude Code
 
 ## Definition of Done
 
-All four pgTAP suites pass; migrations apply on a fresh DB; db lint clean; CI gate active. This is the hard gate that unlocks client-engineering.
+Provision DEP-1 + execute migrations & pgTAP as a CI merge gate. DEV DONE 2026-09-03. Git initialised -> github.com/DiegoDoug/fitney (private). Hosted fitney-dev (Supabase, PG17, MetaTrack org, $0/mo) provisioned; supabase db push + db reset --linked applied 0001–0006 + seed clean; db lint --linked clean; Supabase security advisor clean bar 1 intentional INFO; 31 hosted behavioural checks 31/0. .github/workflows/db-verify.yml green on main (supabase db start -> db reset -> db lint --fail-on error -> supabase test db = 68/68). Local stack also 68/68. Remaining before Done: enable branch protection requiring the db-verify check (human, GitHub UI); production project (TASK-4).
 
 ## Verification
 
-Not Run
+Pass
