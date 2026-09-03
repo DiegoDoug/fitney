@@ -1,0 +1,59 @@
+name: Client verify (typecheck + boundaries + logic tests)
+
+# Owning phase: client-engineering (phase 5). Runs on every PR to main so the
+# required-status-check surface is populated for pure-client PRs too (db-verify
+# is path-filtered to supabase/**). Enforces:
+#   - strict TypeScript on the logic layers (domain/services/data/features)
+#   - the layered dependency-boundary rule (ADR-0002 / AR-RISK-6 / AR-C4)
+#   - the logic + sync + migration + WORK-020 golden-vector test suites
+#
+# The full-app typecheck (tsconfig.json, incl. app/ routes + data/remote gateway)
+# and jest-expo component tests are added with the screen-verification slice once
+# the Expo/RN dependency install is wired here.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - ".github/workflows/client-verify.yml"
+  pull_request:
+    paths:
+      - "client/**"
+      - ".github/workflows/client-verify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: client
+
+jobs:
+  client-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Install only the logic-verification toolchain (no native RN tree needed
+      # for these gates). better-sqlite3 builds from source on ubuntu.
+      - name: Install verification toolchain
+        run: |
+          npm install --no-save --no-audit --no-fund \
+            typescript@~5.9.2 ts-jest@^29.2.5 jest@^29.7.0 @types/jest@^29.5.13 @types/node@^22 \
+            better-sqlite3@^11.8.1 @types/better-sqlite3@^7.6.11 zod@^3.24.1 \
+            dependency-cruiser@^16.4.2
+
+      - name: Typecheck (logic layers, strict)
+        run: npx tsc --noEmit -p tsconfig.logic.json
+
+      - name: Dependency-boundary lint (ADR-0002)
+        run: npx depcruise src app --config .dependency-cruiser.cjs
+
+      - name: Logic + sync + migration + WORK-020 golden-vector tests
+        run: npx jest --config jest.config.cjs --ci

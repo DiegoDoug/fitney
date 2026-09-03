@@ -23,10 +23,13 @@ on:
     paths:
       - "supabase/**"
       - ".github/workflows/db-verify.yml"
+  # `db-verify` is a REQUIRED status check on `main` with a strict (up-to-date)
+  # policy. A path filter here would leave the check "Expected — waiting" and
+  # block merge on any PR that doesn't touch supabase/** (e.g. a client PR).
+  # Run it on every PR so the required-check surface is always reported. This is
+  # a non-weakening change (same gate, run more often) — routed to
+  # `platform-release` for ratification (owner of this workflow / TASK-7 / C-1).
   pull_request:
-    paths:
-      - "supabase/**"
-      - ".github/workflows/db-verify.yml"
   workflow_dispatch:
 
 permissions:

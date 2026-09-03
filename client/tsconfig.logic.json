@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node", "jest", "better-sqlite3"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "noEmit": true
+  },
+  "include": [
+    "src/domain/**/*.ts",
+    "src/services/**/*.ts",
+    "src/data/local/**/*.ts",
+    "src/data/sync/**/*.ts",
+    "src/data/repositories/**/*.ts",
+    "src/data/remote/schemas/**/*.ts",
+    "src/features/**/*.ts",
+    "src/test/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.tsx",
+    "src/data/remote/gateway.ts",
+    "src/data/remote/session-storage.ts",
+    "src/services/impl/**/*.native.ts"
+  ]
+}
