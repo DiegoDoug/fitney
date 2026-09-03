@@ -40,5 +40,6 @@ export const type: Record<
   metric: { fontSize: 20, lineHeight: 24, fontWeight: '500', fontFamily: systemFamily, tabular: true },
 };
 
-/** Applied via `fontVariant: ['tabular-nums']` where supported. */
-export const TABULAR_FONT_VARIANT = ['tabular-nums'] as const;
+/** Applied via `fontVariant: ['tabular-nums']` where supported. Mutable array so
+ *  it assigns to RN's `TextStyle['fontVariant']` (`FontVariant[]`). */
+export const TABULAR_FONT_VARIANT: Array<'tabular-nums'> = ['tabular-nums'];

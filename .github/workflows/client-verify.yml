@@ -1,15 +1,17 @@
-name: Client verify (typecheck + boundaries + logic tests)
+name: Client verify (full-app typecheck + boundaries + logic tests)
 
 # Owning phase: client-engineering (phase 5). Runs on every PR to main so the
 # required-status-check surface is populated for pure-client PRs too (db-verify
 # is path-filtered to supabase/**). Enforces:
-#   - strict TypeScript on the logic layers (domain/services/data/features)
+#   - strict TypeScript over the ENTIRE app (tsconfig.json — app/ routes,
+#     data/remote gateway, components, runtime, every .ts/.tsx)
+#   - strict TypeScript over the logic layers (tsconfig.logic.json — a fast
+#     subset that also runs without the native RN toolchain)
 #   - the layered dependency-boundary rule (ADR-0002 / AR-RISK-6 / AR-C4)
 #   - the logic + sync + migration + WORK-020 golden-vector test suites
 #
-# The full-app typecheck (tsconfig.json, incl. app/ routes + data/remote gateway)
-# and jest-expo component tests are added with the screen-verification slice once
-# the Expo/RN dependency install is wired here.
+# jest-expo component/screen tests + on-device verification (WORK-007) are added
+# with the screen-verification increment.
 
 on:
   push:
@@ -31,29 +33,44 @@ defaults:
     working-directory: client
 
 jobs:
-  client-verify:
+  full-app-typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
 
-      # Install only the logic-verification toolchain (no native RN tree needed
-      # for these gates). better-sqlite3 builds from source on ubuntu.
-      - name: Install verification toolchain
-        run: |
-          npm install --no-save --no-audit --no-fund \
-            typescript@~5.9.2 ts-jest@^29.2.5 jest@^29.7.0 @types/jest@^29.5.13 @types/node@^22 \
-            better-sqlite3@^11.8.1 @types/better-sqlite3@^7.6.11 zod@^3.24.1 \
-            dependency-cruiser@^16.4.2
+      # Full Expo SDK 54 install (client/.npmrc sets legacy-peer-deps=true).
+      - name: Install
+        run: npm ci || npm install
 
-      - name: Typecheck (logic layers, strict)
+      - name: Typecheck — full app (tsconfig.json)
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Typecheck — logic layers (tsconfig.logic.json)
         run: npx tsc --noEmit -p tsconfig.logic.json
 
       - name: Dependency-boundary lint (ADR-0002)
         run: npx depcruise src app --config .dependency-cruiser.cjs
+
+  logic-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Logic tests need only a small toolchain (no native RN tree). better-sqlite3
+      # builds from source on ubuntu.
+      - name: Install verification toolchain
+        run: |
+          npm install --no-save --no-audit --no-fund --legacy-peer-deps \
+            typescript@~5.9.2 ts-jest@^29.2.5 jest@^29.7.0 @types/jest@^29.5.13 @types/node@^22 \
+            better-sqlite3@^11.8.1 @types/better-sqlite3@^7.6.11 zod@^3.24.1
 
       - name: Logic + sync + migration + WORK-020 golden-vector tests
         run: npx jest --config jest.config.cjs --ci

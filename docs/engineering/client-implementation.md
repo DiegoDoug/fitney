@@ -1,16 +1,27 @@
 # Client Implementation — Fitney
 
+> **Status: Phase 5 IN PROGRESS — increment 1 awaiting review. This is NOT a phase
+> submission and does not seek Phase 5 approval.** The Foundation exit gate
+> (SPEC §18) is **not** met: authentication, onboarding, and per-user SQLite
+> isolation are unfinished; screens are not device-verified; sync is not verified
+> against real Supabase. Human assessment 2026-09-03 requested revisions on PR #1
+> (full-app typecheck as a CI gate — done in this pass) and correct lifecycle
+> framing before any merge. This artifact grows increment by increment until the
+> Foundation gate is met and the offline-logging vertical slice is device- and
+> hosted-verified.
+
 ## 1. Phase identity
 
 - Lifecycle role: **Client engineering** (`client-engineering`, phase 5 of 11)
 - Execution date: 2026-09-03
-- Roadmap state at execution: `UNLOCKED` (canonical Notion, DEC-50, 2026-09-03) → `IN PROGRESS` → `AWAITING APPROVAL`
+- Roadmap state: `UNLOCKED` (canonical Notion, DEC-50, 2026-09-03) → **`IN PROGRESS`** (increment 1 under review; the phase is not being submitted)
 - Execution authorization: explicit human instruction, 2026-09-03 ("I explicitly authorize lifecycle Phase 5 — `client-engineering`")
 - Upstream approvals relied on: `product-strategy` (2026-09-01), `evidence-based-ui-ux` (2026-09-02), `visual-ui-design` (2026-09-02), `software-architecture` v4 (2026-09-02), `backend-data-engineering` (APPROVED WITH CONDITIONS 2026-09-02), `security-identity` (APPROVED WITH CONDITIONS 2026-09-03, REV-10), `platform-release` (APPROVED WITH CONDITIONS — dev-only gate — 2026-09-03, REV-11)
 - Classification: **CREATE** (greenfield — no prior client code, `docs/engineering/client-implementation.md` was `MISSING`)
-- Reported result: see §12
-- Feature branch: `phase-5/client-foundation`
-- First-pass scope (human choice 2026-09-03): **Foundation gate + all logic layers** (domain / data / sync / repositories / services) with pure-layer tests; screens are wired but **not** claimed as device-verified; sync-vs-hosted-Supabase deferred to WORK-013.
+- Increment status: see §12
+- Feature branch: `phase-5/client-foundation` → PR #1
+- Increment 1 scope (human choice 2026-09-03): **Foundation structure + all logic layers** (domain / data / sync / repositories / services) with pure-layer tests + a full-app typecheck. Screens are wired but **not** device-verified; sync-vs-hosted-Supabase deferred to WORK-013; **auth / onboarding / per-user DB isolation are increment 2**.
+- Increment sequence agreed with the human (2026-09-03): (1) *this* — Foundation structure + logic layers + full-app typecheck gate; (2) authentication → per-user SQLite → onboarding; (3) real Expo runtime verification (WORK-010) + hosted-dev sync verification (WORK-013); (4) device-test the offline-logging flow (WORK-007); then the Foundation gate is assessed and the vertical slice is signed off. Planning / Progress / Library expansion and phases 9–11 stay on hold throughout.
 
 ## 2. Sources inspected
 
@@ -111,9 +122,11 @@ Repo-relative paths under `client/`.
 | 11. Surface conflicts / sync failures without blocking logging | `SyncEngine` catches all errors → `SyncIndicatorState` (`saved`/`syncing`/`offline`/`needs_attention`); completed-session conflict **parked** in `sync_conflicts` | `push.test.ts` (`conflict on a COMPLETED session is parked and NOT auto-re-issued`), `pull.test.ts` |
 | 12. Basic completion summary + history entry | `features/logging/session-summary.ts` + `app/workout/summary/[sessionId].tsx`; `app/(tabs)/progress.tsx` History list | `offline-logging.test.ts` (completed list + materialised PRs); screen wired |
 
-### 6.3 WORK-020 — client TS ↔ server SQL recompute parity
+### 6.3 WORK-020 — client TS ↔ server SQL recompute parity — **increment-1 evidence only**
 
-`src/domain/{calc,pr,week,uuid5}.ts` + `src/test/golden-vectors.ts` (mirrors `supabase/tests/03_recompute_test.sql`). `src/domain/__tests__/recompute.golden.test.ts` asserts, from the identical vectors:
+**Not yet complete.** This increment establishes *matching-vector* evidence: `src/domain/{calc,pr,week,uuid5}.ts` + `src/test/golden-vectors.ts` (a hand-copy of `supabase/tests/03_recompute_test.sql`) produce the same numbers in `src/domain/__tests__/recompute.golden.test.ts`, and `domain/uuid5.ts` matches the RFC DNS-namespace UUIDv5 vector. **Still required before the derived-data/sync portion is accepted (DEC-52):** a *reproducible cross-run* that executes the recompute on hosted-dev against the same session fixture and asserts the client and server agree on the **actual materialised derived-row IDs and values** (not a hand-copied fixture, not just an RFC UUID unit test). Tracked as an open condition (§9 L-2a, §12 CE-C2a).
+
+Matching-vector table (from the identical hand-copied fixture):
 
 | Quantity | Server (`03_recompute_test.sql`) | Client (this pass) |
 |---|---|---|
@@ -136,9 +149,11 @@ All commands run from `client/`.
 
 | Gate | Command | Result |
 |---|---|---|
-| Strict TypeScript (logic layers: domain, services, data/local, data/sync, data/repositories, data/remote/schemas, features, test) | `npx tsc --noEmit -p tsconfig.logic.json` | **PASS** (exit 0, 0 errors) |
-| Dependency-boundary rule (ADR-0002) over `src` + `app` | `npx depcruise src app --config .dependency-cruiser.cjs` | **PASS** — 0 errors, 1 warning (`no-orphans`: `features/logging/rest-timer.ts` — logic is tested; its UI wiring is deferred to the screen slice) |
-| Logic + sync + migration + WORK-020 suites | `npx jest --config jest.config.cjs --ci` | **PASS** — 9 suites, **40/40 tests** |
+| **Strict TypeScript — FULL APP** (every `.ts`/`.tsx`: `app/` routes, `data/remote/gateway.ts`, `client.ts`, `session-storage.ts`, components, runtime) | `npx tsc --noEmit -p tsconfig.json` | **PASS** (exit 0, 0 errors) — added as a CI gate in this hardening pass. First run surfaced 3 errors (a `ViewProps.role` prop collision on `AppSurface`; a `readonly` `fontVariant` tuple) — both fixed. |
+| Strict TypeScript — logic layers subset (runs without the native RN toolchain) | `npx tsc --noEmit -p tsconfig.logic.json` | **PASS** (0 errors) |
+| Dependency-boundary rule (ADR-0002) over `src` + `app` | `npx depcruise src app --config .dependency-cruiser.cjs` | **PASS** — 0 errors, 1 warning (`no-orphans`: `features/logging/rest-timer.ts` — logic tested; UI wiring is increment 2) |
+| Logic + sync + migration + WORK-020 (matching-vector) suites | `npx jest --config jest.config.cjs --ci` | **PASS** — 9 suites, **40/40 tests**. NOTE: these use a `better-sqlite3` test driver (**not** the Expo SQLite runtime — WORK-010) and a contract-modelling `FakeGateway` (**not** real client↔Supabase integration — WORK-013). |
+| Full-app typecheck as a CI gate | `.github/workflows/client-verify.yml` job `full-app-typecheck` | **wired** — `npm ci` (Expo SDK 54, `client/.npmrc` `legacy-peer-deps=true`) + `tsc -p tsconfig.json` + `tsc -p tsconfig.logic.json` + `depcruise`; blocks the PR on any failure |
 
 ### 7.1 Test inventory (against the phase task list)
 
@@ -185,12 +200,14 @@ Screen states are **implemented in code**; visual/interaction/AX correctness on 
 | # | Item | Owner / tracking |
 |---|---|---|
 | L-1 | **No device / simulator verification.** Screens, navigation, gestures, keyboard-avoidance, VoiceOver/TalkBack, Dynamic Type reflow, dark-mode render, neumorphic rendering, RTL are **authored, not verified**. | WORK-007 (`client-engineering` + `quality-engineering`) — needs a runnable build |
-| L-2 | **Sync not run against real Supabase.** `push`/`pull` are tested against a `FakeGateway` that models the `sync_apply` / PostgREST contract. The full WORK-013 conformance suite (concurrent writers, forced clock skew, kill-mid-push, same-timestamp page boundary, lost-response-with-successor, parked completed-session conflict) against a provisioned project is still required before any table is exposed. | WORK-013 (`software-architecture` + `backend-data-engineering` + `quality-engineering`) — needs DEP-1 client-linked |
-| L-3 | **Auth slice not implemented.** `RuntimeProvider` boots the container from an injected `userId`; Supabase Auth → `userId`, sign-up/in/out/reset, onboarding, and per-user DB switch-on-sign-in land next. `session-storage.ts` + `client.ts` seams are in place. | `client-engineering` (next slice) |
+| L-2 | **Sync not run against real Supabase.** `push`/`pull` are tested against a `FakeGateway` that models the `sync_apply` / PostgREST contract — this is *modelled protocol behaviour*, not client↔Supabase integration. The full WORK-013 conformance suite (concurrent writers, forced clock skew, kill-mid-push, same-timestamp page boundary, lost-response-with-successor, parked completed-session conflict) against a provisioned project is still required before any table is exposed. | WORK-013 (`software-architecture` + `backend-data-engineering` + `quality-engineering`) — needs DEP-1 client-linked |
+| L-2a | **WORK-020 cross-run incomplete.** Only matching-vector + RFC-UUID evidence exists (a hand-copied fixture). A reproducible run against hosted-dev asserting client vs server agree on the actual materialised derived-row IDs + values is still required (DEC-52). | WORK-020 (`client-engineering` + `backend-data-engineering`) — needs DEP-1 client-linked |
+| L-2b | **`better-sqlite3` tests ≠ Expo SQLite runtime.** The 40 tests exercise SQL behaviour under the test driver; the Expo SQLite transaction/WAL/prepared-statement guarantees are unverified (same as L-5). | WORK-010 |
+| L-3 | **Auth / onboarding / per-user DB isolation not implemented → the Foundation exit gate is NOT met.** `RuntimeProvider` boots the container from an injected `userId`; Supabase Auth → `userId`, sign-up/in/out/reset, onboarding (SPEC AUTH-03), and per-user DB switch-on-sign-in / drop-on-sign-out (ADR-0009) are **increment 2**. `session-storage.ts` + `client.ts` seams are in place but not wired to a live session. | `client-engineering` (increment 2) |
 | L-4 | **Planning / Progress-Overview-PRs-Trends / full Library / Settings** screens are shells. Only the logging vertical slice is functional end-to-end (per the "prove the slice first" guardrail). | `client-engineering` (SPEC §18 Phase 2–4 increments) |
 | L-5 | `expo-sqlite@~16` transaction/WAL guarantees not verified on the locked SDK (AR-A4 / AR-C3). `runInTransaction` uses explicit `BEGIN IMMEDIATE`; may need `withExclusiveTransactionAsync`. | WORK-010 (`software-architecture` + `client-engineering`) |
 | L-6 | Icon family not locked (VIS-OQ-3); text-glyph placeholders in components. | WORK-008 |
-| L-7 | Full-app `tsc -p tsconfig.json` (routes + `data/remote/gateway.ts` + `session-storage.ts`) and `jest-expo` component tests are **not** run in this environment (no RN/Expo native install). `client-verify.yml` runs the logic gates; the full-app typecheck + component tests are wired into CI with the screen slice. | `client-engineering` + `quality-engineering` |
+| L-7 | ~~Full-app `tsc -p tsconfig.json` not run.~~ **RESOLVED in the PR #1 hardening pass:** full-app `tsc -p tsconfig.json` (Expo SDK 54 installed) runs and **passes** (3 initial errors fixed), and is now a CI gate (`client-verify.yml` job `full-app-typecheck`). `jest-expo` component/screen tests remain deferred to the screen-verification increment. | `client-engineering` + `quality-engineering` |
 | L-8 | Reactive `useDbQuery` layer (AR-OQ-4 / AR-RISK-3) not built; screens read repos imperatively in `useFocusEffect`/`useEffect`. | `client-engineering` (Foundation hardening) |
 | L-9 | `no-orphans` warning on `features/logging/rest-timer.ts` — logic tested, UI wiring in the active screen deferred to the screen slice. | `client-engineering` |
 | L-10 | WORK-017 (shared machine-readable entity definition) not extracted; `domain/entities.ts` + `data/local/schema/migrations.ts` + `data/remote/schemas/` are hand-kept in lockstep, guarded by `schema-parity.test.ts`. | `client-engineering` + `backend-data-engineering` |
@@ -228,21 +245,42 @@ Branch protection is **demonstrably enforced**; the exposure audit is **clean**.
 
 ## 12. Status
 
-**`PASS WITH CONDITIONS`.**
+**Phase 5 = `IN PROGRESS`. Increment 1 = awaiting review on PR #1 (NOT a phase submission).**
 
-The Foundation gate and the offline-logging vertical-slice **logic** are delivered and verified where verifiable in this environment: strict TypeScript on the logic layers, the layered dependency-boundary rule enforced in CI, forward-only client migrations mirroring the server schema, repository interfaces + local implementations, the full sync engine (transactional outbox with the durable `dispatched` state, `operation_id` exactly-once, successor-aware acknowledgement, hybrid pull with late-commit reconciliation, parked completed-session conflicts), secure token storage + a typed/validated `data/remote` gateway confined to one directory, a client UUID service, parameterised SQLite access, and **WORK-020 passing** — the client TS recompute matches the server golden vectors byte-for-byte (weekly volume, e1RM, max-load PR, rep PR, `week_start` 0–6, formula id/version, rounding, idempotency). 9 test suites, 40/40.
+Delivered and verified where verifiable in this environment: full-app strict TypeScript (`tsc -p tsconfig.json`, now a CI gate), the layered dependency-boundary rule enforced in CI, forward-only client migrations mirroring the server schema, repository interfaces + local implementations, the sync-engine state machine (transactional outbox with the durable `dispatched` state, `operation_id` exactly-once, successor-aware acknowledgement, hybrid pull with late-commit reconciliation, parked completed-session conflicts), secure token-storage + typed-gateway seams confined to one directory, a client UUID service, parameterised SQLite access, and WORK-020 *matching-vector* evidence. 9 test suites, 40/40 — under a `better-sqlite3` driver and a contract-fake gateway.
 
-Conditions for the reviewer to accept or defer:
+**What this establishes vs. what it does not:**
 
-- **CE-C1 (device verification):** L-1 — screens/navigation/accessibility/dark-mode/neumorphic rendering are authored, not device-verified. WORK-007 must run on a build before any visual-parity or accessibility claim.
-- **CE-C2 (real-Supabase sync):** L-2 — the sync engine is verified against a contract-modelling fake, not a provisioned project. WORK-013 must pass against DEP-1 before any user-owned table is exposed through the client API.
-- **CE-C3 (SDK guarantees):** L-5 — `expo-sqlite@~16` transaction/WAL guarantees on the locked SDK are unverified (WORK-010).
-- **CE-C4 (auth slice):** L-3 — Supabase Auth → `userId`, sign-up/in/out/reset, onboarding, per-user DB, and SEC-RESID-1 (server-verifiable delete-account re-auth before beta) are the next `client-engineering` slice.
-- **CE-C5 (routed items):** CE-R1 (`db-verify` trigger widening → `platform-release`), CE-R2 (ISS-28 / BD-DEC-01 → `backend-data-engineering`) are recommendations outside this phase's authority.
-- **CE-C6 (CI depth):** L-7 — `client-verify.yml` runs the logic gates; the full-app typecheck (routes + gateway) and `jest-expo` component tests are wired with the screen slice.
+| Reported evidence | Establishes | Does NOT establish |
+|---|---|---|
+| full-app `tsc` (0 errors) + 40 tests | the app typechecks; the tested logic passes | correct runtime behaviour on device |
+| `better-sqlite3` tests | SQL behaviour under the test driver | Expo SQLite transaction/WAL/prepared-statement guarantees (WORK-010) |
+| `FakeGateway` sync tests | modelled protocol behaviour (dispatched/successor/ack/reconciliation/parked-conflict) | real client ↔ Supabase integration (WORK-013) |
+| WORK-020 golden vectors + RFC UUID test | the client recompute matches a hand-copied fixture; UUIDv5 is RFC-correct | a reproducible client/server cross-run on hosted-dev against actual derived-row IDs (DEC-52) |
 
-## 13. Roadmap / Notion updates required
+**The Foundation exit gate (SPEC §18) is NOT met** — authentication, onboarding, and per-user SQLite isolation are unfinished (L-3), and no state is device- or hosted-verified.
 
-- `development-roadmap.md`: lifecycle row 5 → `AWAITING APPROVAL`; artifact registry `docs/engineering/client-implementation.md` → `AWAITING APPROVAL`; add `client/` to the registry; WORK-020 → `DONE (client cross-run green)`; WORK-011 (boundary lint) → `DONE`; WORK-010 / WORK-013 / WORK-007 / WORK-008 / WORK-017 → carry, owners noted; add CE-DEC-01…08; add CE-RISK rows for L-1/L-2/L-5; TASK-7 → `Done`.
-- Notion (canonical): new Decisions CE-DEC-01…08; new Review "Phase 5 — Client engineering (Foundation + logic layers)"; WORK-020 status → done with the client cross-run evidence; mark TASK-7 (branch protection) complete + record repo is public; ISS-28 note that Phase 5 targeted PG17 without editing BD-DEC-01.
-- `.project-memory/` regenerated from Notion after the above and validated (`.claude/skill-system/validate_system.py` / `npm run check`).
+Open conditions (none of these is "accept or defer" — they are the remaining Foundation work):
+
+- **CE-C1 (device verification):** L-1 — WORK-007 on a runnable build.
+- **CE-C2 (real-Supabase sync):** L-2 — WORK-013 against DEP-1 client-linked.
+- **CE-C2a (WORK-020 cross-run):** L-2a — reproducible hosted-dev cross-run on real derived-row IDs (DEC-52).
+- **CE-C3 (Expo SQLite runtime):** L-2b / L-5 — WORK-010.
+- **CE-C4 (auth → per-user DB → onboarding):** L-3 — increment 2; also carries SEC-RESID-1 (before beta).
+- **CE-C5 (routed items):** CE-R1 (`db-verify` trigger widening → `platform-release` to ratify), CE-R2 (ISS-28 / BD-DEC-01 → `backend-data-engineering`).
+- **CE-C6 (CI depth):** ~~L-7~~ full-app typecheck gate **done** this pass; `jest-expo` component/screen tests + device tests remain (increments 3–4).
+
+### Increment 1 → next steps (agreed with the human 2026-09-03)
+
+1. **PR #1 hardening (this pass):** full-app `tsc` runs, 3 errors fixed, wired as a CI gate. Lifecycle framing corrected to *Phase 5 IN PROGRESS / increment 1 in review*. **Do not merge as a phase approval.**
+2. **Increment 2:** authentication → per-user SQLite isolation → onboarding.
+3. **Increment 3:** real Expo runtime verification (WORK-010) + hosted-dev sync verification (WORK-013) + the WORK-020 cross-run.
+4. **Increment 4:** device-test the offline-logging flow (WORK-007). Then the Foundation gate is assessed.
+
+Planning / Progress / Library expansion and phases 9–11 stay on hold throughout.
+
+## 13. Roadmap / Notion updates applied
+
+- `development-roadmap.md`: lifecycle row 5 → **`IN PROGRESS`** (result `—`, "increment 1 in review, not a phase submission, Foundation exit gate not met"); artifact registry entries → `IN PROGRESS`; add `client/`; WORK-020 → *matching-vector evidence; hosted cross-run still required*; WORK-011 (boundary lint) → `DONE`; WORK-010 / WORK-013 / WORK-007 / WORK-008 / WORK-017 → carry with owners; CE-DEC-01…08; CE-RISK-1…3; human review log → **REVISIONS REQUESTED** (increment 1, not a phase submission); TASK-7 → `Done`; validator re-run → PASS.
+- Notion (canonical): Reviews & Verification entry *"Phase 5 — Client engineering: Foundation gate + offline-logging logic layers"* → **retitled/reframed as an increment-1 review with REVISIONS REQUESTED**; REL-5 milestone → `Active` (Phase 5 in progress); TASK-7 → `Done` (branch protection verified, repo public). CE-DEC-01…08 enumerated for formalization into the Decisions DB.
+- `.project-memory/` regenerated from Notion and validated (`validate_system.py` PASS, `npm run check` OK).

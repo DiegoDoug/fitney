@@ -61,7 +61,7 @@ export function AppSurface({
   style,
   children,
   ...rest
-}: ViewProps & { role?: ElevationRole }) {
+}: Omit<ViewProps, 'role'> & { role?: ElevationRole }) {
   const t = useTheme();
   return (
     <View
