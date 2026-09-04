@@ -10,7 +10,13 @@ import { createTestDb } from './better-sqlite3-driver';
 import { REMOTE_SCHEMAS, type RemoteSchemaKey } from '@/data/remote/schemas';
 import { ENTITY_TABLE } from '@/domain/entities';
 
-const LOCAL_ONLY = new Set(['synced_version', 'dirty', 'local_updated_at']);
+const LOCAL_ONLY = new Set([
+  'synced_version',
+  'dirty',
+  'local_updated_at',
+  // m0002: local-only onboarding gate marker on `profiles`, never in a sync payload
+  'onboarding_completed_at',
+]);
 // name_normalized is a stored generated column server-side; the client keeps it
 // as a plain column it fills on write. It IS in both, so no exception needed.
 

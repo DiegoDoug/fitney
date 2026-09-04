@@ -9,6 +9,10 @@ export type AnalyticsEvent =
   | { name: 'workout_completed' }
   | { name: 'workout_abandoned' }
   | { name: 'set_completed' }
+  | { name: 'signed_in' }
+  | { name: 'signed_out' }
+  | { name: 'account_switched' }
+  | { name: 'onboarding_completed' }
   | { name: 'week_created'; source: 'blank' | 'copy' | 'template' }
   | { name: 'planned_workout_created' }
   | { name: 'template_used' }

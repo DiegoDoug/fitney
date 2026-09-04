@@ -2,7 +2,7 @@
 notion_page_id: "3cfe6070-43bc-8046-b281-eb56b92335af"
 notion_url: "https://app.notion.com/p/Fitney-3cfe607043bc8046b281eb56b92335af"
 last_edited: "2026-09-03T15:00:00.000Z"
-generated_at: "2026-09-03T23:48:44.499Z"
+generated_at: "2026-09-04T13:22:17.830Z"
 ---
 
 # Current State
@@ -43,6 +43,7 @@ Phase 5 Client Engineering is UNLOCKED but NOT STARTED after human approval of t
 
 ## Reviews Requiring Attention
 
+- Phase 5 — Client engineering: increment 2 (auth → per-user SQLite isolation → onboarding) — ready for review — In Review
 - Phase 5 — Client engineering: increment 1 (Foundation + logic layers) — in review, revisions requested — In Review
 - Phase 8 — Platform & Release human approval (dev-only gate) — Pass with Conditions
 - Phase 7 — Security & Identity human approval after hosted verification — Pass with Conditions

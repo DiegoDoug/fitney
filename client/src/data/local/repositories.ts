@@ -19,29 +19,48 @@ import type {
   WorkoutSession,
 } from '@/domain/entities';
 import type { DerivedRows, SetFact } from '@/domain/pr';
-import { ActiveSessionExistsError } from '@/domain/errors';
+import { ActiveSessionExistsError, WritesFrozenError } from '@/domain/errors';
 import type { Uuid } from '@/domain/ids';
 import type {
   DerivedRepository,
   ExerciseRepository,
+  OnboardingState,
   PerformedSetRepository,
   ProfileRepository,
   Repositories,
   SessionRepository,
 } from '@/data/repositories/types';
 
-type Deps = { db: SqlDatabase; clock: Clock; ids: IdGenerator };
+type Deps = {
+  db: SqlDatabase;
+  clock: Clock;
+  ids: IdGenerator;
+  /**
+   * CE-R5 v2 (DEC-53): when this returns true, the FEATURE write path (every
+   * method that enqueues a `sync_outbox` entry) is paused so no new outbound
+   * mutation can be created during the "Back up & sign out" final check. Reads,
+   * the sync engine's own writes (it does not go through these repos), local-only
+   * markers, and pull-apply (`bulkPut` / `derived.apply`) are unaffected.
+   */
+  isFrozen?: () => boolean;
+};
 
 const NEW_ROW_META = { version: 1, synced_version: null, dirty: 1 as const };
 
+/** Guard the feature write path while local writes are frozen (CE-R5 v2). */
+function assertWritable(isFrozen: (() => boolean) | undefined): void {
+  if (isFrozen?.()) throw new WritesFrozenError();
+}
+
 // ---------------------------------------------------------------- profile
-function profileRepo({ db, clock, ids }: Deps): ProfileRepository {
+function profileRepo({ db, clock, ids, isFrozen }: Deps): ProfileRepository {
   return {
     async get(userId) {
       const r = await getRowById<Record<string, unknown>>(db, 'profiles', userId);
       return r ? fromDbRow<Profile>(r) : null;
     },
     async upsert(userId, profile) {
+      assertWritable(isFrozen);
       const now = clock.now();
       await runInTransaction(db, () =>
         enqueueMutation({
@@ -53,6 +72,48 @@ function profileRepo({ db, clock, ids }: Deps): ProfileRepository {
           nowMs: now,
           newOperationId: ids.newV4(),
         }),
+      );
+    },
+    async getOnboardingState(userId): Promise<OnboardingState> {
+      const r = await db.getFirstAsync<{
+        display_name: string | null;
+        unit_pref: string;
+        week_start: number;
+        default_rest_seconds: number;
+        training_goal: string | null;
+        synced_version: number | null;
+        onboarding_completed_at: number | null;
+      }>(
+        `SELECT display_name, unit_pref, week_start, default_rest_seconds, training_goal,
+                synced_version, onboarding_completed_at
+           FROM profiles WHERE id = ?`,
+        [userId],
+      );
+      if (!r) {
+        return { profileExists: false, completed: false, serverSynced: false, draft: null };
+      }
+      const serverSynced = r.synced_version != null;
+      const completed = r.onboarding_completed_at != null || serverSynced;
+      return {
+        profileExists: true,
+        completed,
+        serverSynced,
+        draft: completed
+          ? null
+          : {
+              displayName: r.display_name ?? '',
+              unitPref: r.unit_pref === 'lb' ? 'lb' : 'kg',
+              weekStart: r.week_start,
+              defaultRestSeconds: r.default_rest_seconds,
+              trainingGoal: r.training_goal,
+            },
+      };
+    },
+    async markOnboardingComplete(userId, nowMs) {
+      // set-once; never enqueues an outbox op (local-only marker, m0002)
+      await db.runAsync(
+        `UPDATE profiles SET onboarding_completed_at = COALESCE(onboarding_completed_at, ?) WHERE id = ?`,
+        [nowMs, userId],
       );
     },
   };
@@ -109,7 +170,7 @@ function exerciseRepo({ db }: Deps): ExerciseRepository {
 }
 
 // ---------------------------------------------------------------- session
-function sessionRepo({ db, clock, ids }: Deps): SessionRepository {
+function sessionRepo({ db, clock, ids, isFrozen }: Deps): SessionRepository {
   return {
     async getActive(userId) {
       const r = await db.getFirstAsync<Record<string, unknown>>(
@@ -140,6 +201,7 @@ function sessionRepo({ db, clock, ids }: Deps): SessionRepository {
       return rows.map((r) => fromDbRow<SessionExercise>(r));
     },
     async createActive(userId, session, exercises) {
+      assertWritable(isFrozen);
       const now = clock.now();
       // one-active-session guard (FR-LOG-12) — DB partial-unique index backs this up
       const active = await db.getFirstAsync<{ id: string }>(
@@ -172,6 +234,7 @@ function sessionRepo({ db, clock, ids }: Deps): SessionRepository {
       });
     },
     async setStatus(userId, sessionId, status, endedAtIso) {
+      assertWritable(isFrozen);
       const now = clock.now();
       const cur = await getRowById<Record<string, unknown>>(db, 'workout_sessions', sessionId);
       if (!cur) return;
@@ -189,6 +252,7 @@ function sessionRepo({ db, clock, ids }: Deps): SessionRepository {
       );
     },
     async setRestTimerAnchor(userId, sessionId, anchorIso) {
+      assertWritable(isFrozen);
       const now = clock.now();
       const cur = await getRowById<Record<string, unknown>>(db, 'workout_sessions', sessionId);
       if (!cur) return;
@@ -208,7 +272,7 @@ function sessionRepo({ db, clock, ids }: Deps): SessionRepository {
 }
 
 // ------------------------------------------------------------ performed set
-function performedSetRepo({ db, clock, ids }: Deps): PerformedSetRepository {
+function performedSetRepo({ db, clock, ids, isFrozen }: Deps): PerformedSetRepository {
   return {
     async listBySession(sessionId) {
       const rows = await db.getAllAsync<Record<string, unknown>>(
@@ -221,6 +285,7 @@ function performedSetRepo({ db, clock, ids }: Deps): PerformedSetRepository {
       return rows.map((r) => fromDbRow<PerformedSet>(r));
     },
     async upsert(userId, set) {
+      assertWritable(isFrozen);
       const now = clock.now();
       await runInTransaction(db, () =>
         enqueueMutation({
@@ -235,6 +300,7 @@ function performedSetRepo({ db, clock, ids }: Deps): PerformedSetRepository {
       );
     },
     async remove(userId, setId) {
+      assertWritable(isFrozen);
       const now = clock.now();
       const cur = await getRowById<Record<string, unknown>>(db, 'performed_sets', setId);
       if (!cur) return;
@@ -356,10 +422,12 @@ function derivedRepo({ db }: Deps): DerivedRepository {
 
 // ---------------------------------------------------------------- helpers
 function stripLocalMeta<T extends Partial<SyncMeta>>(row: T): Record<string, unknown> {
-  const { synced_version, dirty, local_updated_at, ...rest } = row as Record<string, unknown>;
+  const { synced_version, dirty, local_updated_at, onboarding_completed_at, ...rest } =
+    row as Record<string, unknown>;
   void synced_version;
   void dirty;
   void local_updated_at;
+  void onboarding_completed_at; // local-only marker (m0002) — never synced
   return rest;
 }
 

@@ -25,9 +25,31 @@ export type Mutation = {
   row: Record<string, unknown>;
 };
 
+/** Local-only onboarding gate state for a user's device (m0002). */
+export type OnboardingState = {
+  /** a local profiles row exists */
+  profileExists: boolean;
+  /** the first-run flow finished on this device */
+  completed: boolean;
+  /** the row has been round-tripped with the server (onboarded on another device) */
+  serverSynced: boolean;
+  /** current values, for prefilling a resumed / partial onboarding form */
+  draft: {
+    displayName: string;
+    unitPref: Profile['unit_pref'];
+    weekStart: number;
+    defaultRestSeconds: number;
+    trainingGoal: string | null;
+  } | null;
+};
+
 export interface ProfileRepository {
   get(userId: Uuid): Promise<Profile | null>;
   upsert(userId: Uuid, profile: Profile): Promise<void>;
+  /** read the local-only onboarding marker + a prefill draft (no network) */
+  getOnboardingState(userId: Uuid): Promise<OnboardingState>;
+  /** set the local-only marker once (idempotent); never enqueues an outbox op */
+  markOnboardingComplete(userId: Uuid, nowMs: number): Promise<void>;
 }
 
 export interface ExerciseRepository {
