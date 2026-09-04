@@ -5,8 +5,8 @@ title: "Phase 5 — Client engineering"
 notion_page_id: "3cfe6070-43bc-81a4-bfc2-ec34403fd318"
 notion_url: "https://app.notion.com/p/Phase-5-Client-engineering-3cfe607043bc81a4bfc2ec34403fd318"
 created: "2026-09-02T20:15:00.000Z"
-last_edited: "2026-09-02T20:15:00.000Z"
-status: "Blocked"
+last_edited: "2026-09-03T23:48:00.000Z"
+status: "Active"
 ---
 
 # Phase 5 — Client engineering
@@ -21,4 +21,8 @@ Phase
 
 ## Exit Criteria
 
-LOCKED by human gate. Unlocks only when migrations + dependency-boundary lint + pgTAP suites 01–04 execute successfully on DEP-1 AND security-identity is finalised. Blocked on DEP-1 (ISS-1) and the phase-7 verification gate (governing decision C). Ordering: after phases 6 + 7 execution evidence.
+UNLOCKED 2026-09-03 by human approval of the dev-only gate. DEP-1 development execution and Phase 7 verification are satisfied. Phase 5 has not started; it requires explicit execution authorization. Build the offline logging vertical slice first. WORK-020 client TypeScript ↔ server SQL golden-vector parity is an acceptance condition before Phase 5 approval, not a start prerequisite. Production infrastructure remains deferred.
+
+## GitHub Ref
+
+https://github.com/DiegoDoug/fitney/pull/1

@@ -1,7 +1,7 @@
 ---
 notion_page_id: "3cfe6070-43bc-8046-b281-eb56b92335af"
 notion_url: "https://app.notion.com/p/Fitney-3cfe607043bc8046b281eb56b92335af"
-last_edited: "2026-09-03T04:29:00.000Z"
+last_edited: "2026-09-03T15:00:00.000Z"
 ---
 
 # Fitney
@@ -18,7 +18,7 @@ Build
 
 ## Current Focus
 
-Phase 8 (platform-release) AWAITING APPROVAL — execution-evidence gate now SATISFIED. Human 2026-09-03: 'APPROVED - dev-only gate'; ISS-27 resolved to authenticated-only catalogue; git + one hosted fitney-dev project authorised; production deferred; WORK-020 -> phase 5 acceptance condition. Done this pass: git initialised -> github.com/DiegoDoug/fitney (private); db-verify GitHub Actions gate GREEN on main (68/68); hosted fitney-dev (Supabase, Postgres 17, MetaTrack org, $0/mo) provisioned + migrations applied + db lint --linked clean + Supabase security advisor clean (bar 1 intentional INFO) + 31 hosted behavioural checks 31/0 on the real authenticated/anon/service_role roles. 15 defects surfaced across phase-8 execution (F-1..F-14 + ISS-27) all fixed in place under WORK-022 while migrations were unshipped. Local supabase test db = 68/68. NEXT: human approval of phase 8 (and phase 7) -> then client-engineering unlocks. Deferred human steps: production Supabase project, hosted auth hardening (SEC-C2), supabase secrets set + Edge Function deploy, branch protection requiring db-verify. Open: ISS-28 (PG17 vs BD-DEC-01 PG15 — backend to ratify).
+Phase 5 Client Engineering is UNLOCKED but NOT STARTED after human approval of the dev-only gate on 2026-09-03. Phases 6, 7, and 8 are Approved with Conditions; DEP-1 development gate and WORK-022 are complete. Next recommended action: resolve non-blocking ISS-28 by ratifying PostgreSQL 17, enable main branch protection requiring db-verify, then explicitly authorize Phase 5 and build the offline logging vertical slice. WORK-020 is a Phase 5 acceptance condition. Production Supabase and phases 9–11 remain deferred/locked.
 
 ## Repository
 

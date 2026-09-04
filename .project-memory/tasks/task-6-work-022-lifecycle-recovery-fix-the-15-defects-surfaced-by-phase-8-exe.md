@@ -5,8 +5,8 @@ title: "WORK-022 — lifecycle recovery: fix the 15 defects surfaced by phase-8 
 notion_page_id: "3d0e6070-43bc-81b3-8afc-f180f6208715"
 notion_url: "https://app.notion.com/p/WORK-022-lifecycle-recovery-fix-the-15-defects-surfaced-by-phase-8-execution-local-hosted-3d0e607043bc81b38afcf180f6208715"
 created: "2026-09-03T02:47:00.000Z"
-last_edited: "2026-09-03T04:27:00.000Z"
-status: "Review"
+last_edited: "2026-09-03T15:00:00.000Z"
+status: "Done"
 ---
 
 # WORK-022 — lifecycle recovery: fix the 15 defects surfaced by phase-8 execution (local + hosted)
@@ -25,7 +25,7 @@ Claude Code
 
 ## Definition of Done
 
-MET on all three surfaces 2026-09-03. LOCAL: db reset x2 + db lint clean (warning+error) + supabase test db PASS 68/68 + runtime probes. CI: db-verify green on main (68/68). HOSTED (fitney-dev, PG17): db push / db reset --linked / db lint --linked clean; Supabase security advisor clean bar 1 intentional INFO; 31 behavioural checks as authenticated/anon/service_role = 31/0. Evidence docs/platform/evidence/05-10. Awaits human approval of PHASE 8. Client-TS <-> server recompute golden-vector cross-run (WORK-020) moved to phase 5 as an acceptance condition (human 2026-09-03).
+MET and human-approved 2026-09-03. Local database gate passed 68/68 with clean lint and runtime probes; CI db-verify passed on main; hosted fitney-dev migrations/lint/security-advisor review and 31/31 real-role checks passed. All F-1…F-14 findings and ISS-27 were remediated or resolved. ISS-28 is a separate ratification issue; WORK-020 is a Phase 5 acceptance condition.
 
 ## Due Date
 
@@ -34,3 +34,7 @@ MET on all three surfaces 2026-09-03. LOCAL: db reset x2 + db lint clean (warnin
 ## Verification
 
 Pass
+
+## Commit / PR
+
+https://github.com/DiegoDoug/fitney/commit/26ab1a6

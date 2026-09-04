@@ -5,8 +5,8 @@ title: "Phase 7 — Security and identity"
 notion_page_id: "3cfe6070-43bc-8134-ba7c-fcdf6a87c0f8"
 notion_url: "https://app.notion.com/p/Phase-7-Security-and-identity-3cfe607043bc8134ba7cfcdf6a87c0f8"
 created: "2026-09-02T20:15:00.000Z"
-last_edited: "2026-09-02T20:15:00.000Z"
-status: "Ready for Review"
+last_edited: "2026-09-03T15:00:00.000Z"
+status: "Approved"
 ---
 
 # Phase 7 — Security and identity
@@ -21,4 +21,8 @@ Phase
 
 ## Exit Criteria
 
-Artifact docs/security/security-identity.md. Reviewed PASS WITH CONDITIONS but HELD — NOT APPROVED (human 2026-09-02): 0 executed tests, verification gate unsatisfied. Stays Pass with Conditions / unapproved until DEP-1 is provisioned and supabase/tests/01–04 + db reset + db lint execute successfully (governing decision C). Realises SEC-DEC-01…SEC-DEC-05. Ordering: after phase 6; final approval depends on the platform-release DEP-1 execution evidence.
+HUMAN APPROVED WITH CONDITIONS 2026-09-03 after DEC-3 execution evidence was satisfied. Local pgTAP passed 68/68; CI db-verify passed; hosted fitney-dev behavioral verification passed 31/31 across authenticated, anon, and service_role; hosted advisor findings F-13/F-14 remediated; ISS-27 resolved to authenticated-only catalogue access. Remaining pre-beta/production conditions: stronger deletion re-auth, retention/PITR decision, production auth/secrets/function deployment, planned external validation, and ISS-28 PostgreSQL 17 ratification.
+
+## GitHub Ref
+
+https://github.com/DiegoDoug/fitney/commit/26ab1a6

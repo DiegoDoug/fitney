@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-03T04:29:27.715Z",
+  "generated_at": "2026-09-03T23:48:44.510Z",
   "project": {
     "id": "3cfe6070-43bc-8046-b281-eb56b92335af",
     "name": "Fitney",
     "notion_url": "https://app.notion.com/p/Fitney-3cfe607043bc8046b281eb56b92335af"
   },
   "counts": {
-    "decisions": 49,
+    "decisions": 52,
     "adrs": 9,
     "requirements": 71,
     "issues": 28,
-    "tasks": 6,
+    "tasks": 7,
     "milestones": 16,
-    "reviews": 9,
+    "reviews": 12,
     "handoffs": 2
   },
   "generated_by": "notion-project-memory-bridge@0.1.0"

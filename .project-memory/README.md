@@ -1,8 +1,8 @@
 ---
 notion_page_id: "3cfe6070-43bc-8046-b281-eb56b92335af"
 notion_url: "https://app.notion.com/p/Fitney-3cfe607043bc8046b281eb56b92335af"
-last_edited: "2026-09-03T04:29:00.000Z"
-generated_at: "2026-09-03T04:29:27.702Z"
+last_edited: "2026-09-03T15:00:00.000Z"
+generated_at: "2026-09-03T23:48:44.495Z"
 generator: "notion-project-memory-bridge@0.1.0"
 ---
 
@@ -14,11 +14,14 @@ Generated from the canonical Notion Shared Project Memory workspace. **Do not ed
 
 - **Status:** In progress
 - **Stage:** Build
-- **Current focus:** Phase 8 (platform-release) AWAITING APPROVAL — execution-evidence gate now SATISFIED. Human 2026-09-03: 'APPROVED - dev-only gate'; ISS-27 resolved to authenticated-only catalogue; git + one hosted fitney-dev project authorised; production deferred; WORK-020 -> phase 5 acceptance condition. Done this pass: git initialised -> github.com/DiegoDoug/fitney (private); db-verify GitHub Actions gate GREEN on main (68/68); hosted fitney-dev (Supabase, Postgres 17, MetaTrack org, $0/mo) provisioned + migrations applied + db lint --linked clean + Supabase security advisor clean (bar 1 intentional INFO) + 31 hosted behavioural checks 31/0 on the real authenticated/anon/service_role roles. 15 defects surfaced across phase-8 execution (F-1..F-14 + ISS-27) all fixed in place under WORK-022 while migrations were unshipped. Local supabase test db = 68/68. NEXT: human approval of phase 8 (and phase 7) -> then client-engineering unlocks. Deferred human steps: production Supabase project, hosted auth hardening (SEC-C2), supabase secrets set + Edge Function deploy, branch protection requiring db-verify. Open: ISS-28 (PG17 vs BD-DEC-01 PG15 — backend to ratify).
+- **Current focus:** Phase 5 Client Engineering is UNLOCKED but NOT STARTED after human approval of the dev-only gate on 2026-09-03. Phases 6, 7, and 8 are Approved with Conditions; DEP-1 development gate and WORK-022 are complete. Next recommended action: resolve non-blocking ISS-28 by ratifying PostgreSQL 17, enable main branch protection requiring db-verify, then explicitly authorize Phase 5 and build the offline logging vertical slice. WORK-020 is a Phase 5 acceptance condition. Production Supabase and phases 9–11 remain deferred/locked.
 - **GitHub:** https://github.com/DiegoDoug/fitney
 
 ## Decisions
 
+- [DEC-51 — Exercise catalogue access is authenticated-only](./decisions/dec-51-exercise-catalogue-access-is-authenticated-only.md) — **Approved**
+- [DEC-50 — Dev-only platform gate approved; production infrastructure deferred](./decisions/dec-50-dev-only-platform-gate-approved-production-infrastructure-deferred.md) — **Approved**
+- [DEC-52 — WORK-020 is a Phase 5 acceptance condition, not a client-unlock prerequisite](./decisions/dec-52-work-020-is-a-phase-5-acceptance-condition-not-a-client-unlock-prerequ.md) — **Approved**
 - [DEC-43 — BD-DEC-04 — RLS baseline (enable + force, per-command policies)](./decisions/dec-43-bd-dec-04-rls-baseline-enable-force-per-command-policies.md) — **Superseded**
 - [DEC-47 — SEC-DEC-03 — Derived-table write model: ENABLE (not FORCE) RLS, client DML revoked, definer recompute, hardened sync_apply](./decisions/dec-47-sec-dec-03-derived-table-write-model-enable-not-force-rls-client-dml-r.md) — **Approved**
 - [DEC-45 — SEC-DEC-01 — Authorization boundary = RLS + SECURITY INVOKER functions + FK integrity, all server-side](./decisions/dec-45-sec-dec-01-authorization-boundary-rls-security-invoker-functions-fk-in.md) — **Approved**
@@ -181,21 +184,21 @@ Generated from the canonical Notion Shared Project Memory workspace. **Do not ed
 ## Roadmap
 
 - [REL-16 — MVP release](./milestones/rel-16-mvp-release.md) — **Planned**
-- [REL-12 — Gate — DEP-1 execution gate (migrations + pgTAP + lint green on a provisioned Supabase project)](./milestones/rel-12-gate-dep-1-execution-gate-migrations-pgtap-lint-green-on-a-provisioned.md) — **Ready for Review**
+- [REL-12 — Gate — DEP-1 execution gate (migrations + pgTAP + lint green on a provisioned Supabase project)](./milestones/rel-12-gate-dep-1-execution-gate-migrations-pgtap-lint-green-on-a-provisioned.md) — **Approved**
 - [REL-14 — Gate — Sync-protocol conformance suite (against real Supabase)](./milestones/rel-14-gate-sync-protocol-conformance-suite-against-real-supabase.md) — **Planned**
 - [REL-13 — Gate — Dependency-boundary lint CI gate](./milestones/rel-13-gate-dependency-boundary-lint-ci-gate.md) — **Planned**
 - [REL-15 — Gate — Pre-beta security gate](./milestones/rel-15-gate-pre-beta-security-gate.md) — **Planned**
 - [REL-9 — Phase 9 — Quality engineering](./milestones/rel-9-phase-9-quality-engineering.md) — **Planned**
-- [REL-7 — Phase 7 — Security and identity](./milestones/rel-7-phase-7-security-and-identity.md) — **Ready for Review**
+- [REL-7 — Phase 7 — Security and identity](./milestones/rel-7-phase-7-security-and-identity.md) — **Approved**
 - [REL-1 — Phase 1 — Product strategy](./milestones/rel-1-phase-1-product-strategy.md) — **Approved**
-- [REL-5 — Phase 5 — Client engineering](./milestones/rel-5-phase-5-client-engineering.md) — **Blocked**
+- [REL-5 — Phase 5 — Client engineering](./milestones/rel-5-phase-5-client-engineering.md) — **Active**
 - [REL-2 — Phase 2 — UX product design (evidence-based-ui-ux)](./milestones/rel-2-phase-2-ux-product-design-evidence-based-ui-ux.md) — **Approved**
 - [REL-4 — Phase 4 — Software architecture](./milestones/rel-4-phase-4-software-architecture.md) — **Approved**
 - [REL-3 — Phase 3 — Visual UI design](./milestones/rel-3-phase-3-visual-ui-design.md) — **Approved**
 - [REL-6 — Phase 6 — Backend and data engineering](./milestones/rel-6-phase-6-backend-and-data-engineering.md) — **Approved**
 - [REL-11 — Phase 11 — Integrated implementation (implementation-orchestrator)](./milestones/rel-11-phase-11-integrated-implementation-implementation-orchestrator.md) — **Planned**
 - [REL-10 — Phase 10 — Production operations](./milestones/rel-10-phase-10-production-operations.md) — **Planned**
-- [REL-8 — Phase 8 — Platform and release](./milestones/rel-8-phase-8-platform-and-release.md) — **Ready for Review**
+- [REL-8 — Phase 8 — Platform and release](./milestones/rel-8-phase-8-platform-and-release.md) — **Approved**
 
 ## Recent Handoffs
 
