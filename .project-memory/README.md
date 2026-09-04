@@ -2,7 +2,7 @@
 notion_page_id: "3cfe6070-43bc-8046-b281-eb56b92335af"
 notion_url: "https://app.notion.com/p/Fitney-3cfe607043bc8046b281eb56b92335af"
 last_edited: "2026-09-03T15:00:00.000Z"
-generated_at: "2026-09-04T03:56:17.635Z"
+generated_at: "2026-09-04T04:26:58.385Z"
 generator: "notion-project-memory-bridge@0.1.0"
 ---
 
@@ -19,6 +19,7 @@ Generated from the canonical Notion Shared Project Memory workspace. **Do not ed
 
 ## Decisions
 
+- [DEC-53 — Approve CE-R5 v2 (sign-out policy + ADR-0009 update), CE-R6 (required checks), CE-R7 (RN/worklets pins) — bounded implementation](./decisions/dec-53-approve-ce-r5-v2-sign-out-policy-adr-0009-update-ce-r6-required-checks.md) — **Approved**
 - [DEC-51 — Exercise catalogue access is authenticated-only](./decisions/dec-51-exercise-catalogue-access-is-authenticated-only.md) — **Approved**
 - [DEC-50 — Dev-only platform gate approved; production infrastructure deferred](./decisions/dec-50-dev-only-platform-gate-approved-production-infrastructure-deferred.md) — **Approved**
 - [DEC-52 — WORK-020 is a Phase 5 acceptance condition, not a client-unlock prerequisite](./decisions/dec-52-work-020-is-a-phase-5-acceptance-condition-not-a-client-unlock-prerequ.md) — **Approved**
