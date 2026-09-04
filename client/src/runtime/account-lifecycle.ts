@@ -98,38 +98,68 @@ export function decideAccountAction(
 // --------------------------------------------------------- sign-out disposition
 export type OutstandingWork = { outbox: number; openConflicts: number };
 
-export type SignOutDisposition = {
-  /** drop the per-user SQLite file (ADR-0009 clean case) vs retain it */
-  dropLocalDb: boolean;
-  /** true when there is unsynced local work that must NOT be silently discarded */
-  hasUnsyncedWork: boolean;
-  reason: string;
-};
+/** Why the per-user runtime is being retired (CE-R5 v2 / DEC-53). */
+export type SignOutCause =
+  | 'user_initiated' // the user tapped Sign out
+  | 'session_expired' // refresh/token failure — involuntary
+  | 'account_switch' // displaced by another account signing in — involuntary
+  | 'account_deleted'; // the delete-account flow returned a CONFIRMED server deletion
+
+/** A resolved choice from the dirty user-initiated sign-out sheet. */
+export type SignOutChoice = 'keep' | 'discard';
+
+export type SignOutDisposition =
+  | { action: 'drop'; reason: string }
+  /** retain the per-user file; `notify` = show a non-blocking notice naming the account */
+  | { action: 'retain'; notify: boolean; reason: string }
+  /** user-initiated sign-out with outstanding work — the caller MUST surface the
+   *  choice sheet (Back up / Keep / Discard / Cancel) BEFORE calling the provider
+   *  sign-out, so Cancel can leave the session intact. */
+  | { action: 'prompt'; outstanding: OutstandingWork; reason: string };
+
+function hasWork(w: OutstandingWork): boolean {
+  return w.outbox > 0 || w.openConflicts > 0;
+}
 
 /**
- * INTERIM POLICY (routed to `security-identity` + `evidence-based-ui-ux` for
- * ratification — docs/engineering/client-implementation.md §10, CE-R5).
+ * CE-R5 v2 (DEC-53, human-approved 2026-09-04) — sign-out disposition.
+ * See docs/engineering/client-implementation.md §14.10.
  *
- * ADR-0009 says "drop the per-user local DB on verified sign-out". That is
- * unambiguous only when everything is already synced. When the outbox still has
- * `pending`/`dispatched` entries (or there are unresolved conflicts), dropping
- * the file would *silently discard* dispatched operations — which this increment
- * is explicitly forbidden from doing.
+ * "Outstanding work" ≡ any `pending`/`dispatched` `sync_outbox` row OR any
+ * unresolved `sync_conflicts` row. Rules:
  *
- * Interim resolution that satisfies both: on a clean sign-out drop the DB; when
- * unsynced work exists, RETAIN the per-user DB file (nothing is discarded), clear
- * the session/secure-store, and let the caller surface a non-blocking notice.
- * The retained DB is reused when that same user signs in again and the outbox
- * drains. A blocking "back up first / discard" confirmation UX is the owner
- * decision being routed.
+ *  - `account_deleted` (CONFIRMED server deletion)      -> drop unconditionally.
+ *  - `session_expired` / `account_switch` (involuntary) -> ALWAYS retain, notify.
+ *      Never drop on an involuntary end, regardless of outstanding work — even a
+ *      clean expiry retains so re-auth resumes instantly (v1 wrongly dropped it).
+ *  - `user_initiated` + explicit `choice = 'keep'`      -> retain (no notify — chosen).
+ *  - `user_initiated` + explicit `choice = 'discard'`   -> drop (after the caller's
+ *      second confirm; the ONLY discard path besides "Remove account from device").
+ *  - `user_initiated`, no choice, no outstanding work   -> drop (ADR-0009 clean case).
+ *  - `user_initiated`, no choice, outstanding work      -> PROMPT.
+ *
+ * There is NO time-based / automatic deletion of unsynced or conflicted work
+ * (FR-SYNC-04). Re-authentication reactivates a retained file as the active DB;
+ * draining its outbox is normal sync and never deletes it.
  */
-export function decideSignOutDisposition(work: OutstandingWork): SignOutDisposition {
-  const hasUnsyncedWork = work.outbox > 0 || work.openConflicts > 0;
-  return hasUnsyncedWork
-    ? {
-        dropLocalDb: false,
-        hasUnsyncedWork: true,
-        reason: `retain_db_unsynced(outbox=${work.outbox},conflicts=${work.openConflicts})`,
-      }
-    : { dropLocalDb: true, hasUnsyncedWork: false, reason: 'clean_signout_drop_db' };
+export function decideSignOutDisposition(
+  cause: SignOutCause,
+  work: OutstandingWork,
+  choice?: SignOutChoice,
+): SignOutDisposition {
+  if (cause === 'account_deleted') {
+    return { action: 'drop', reason: 'account_deleted_confirmed' };
+  }
+  if (cause === 'session_expired' || cause === 'account_switch') {
+    return { action: 'retain', notify: true, reason: `${cause}_retain(outbox=${work.outbox},conflicts=${work.openConflicts})` };
+  }
+  // user_initiated
+  if (choice === 'keep') return { action: 'retain', notify: false, reason: 'user_keep_on_device' };
+  if (choice === 'discard') return { action: 'drop', reason: 'user_discard_confirmed' };
+  if (!hasWork(work)) return { action: 'drop', reason: 'user_signout_clean' };
+  return {
+    action: 'prompt',
+    outstanding: work,
+    reason: `user_signout_outstanding(outbox=${work.outbox},conflicts=${work.openConflicts})`,
+  };
 }

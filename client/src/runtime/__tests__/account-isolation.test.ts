@@ -107,8 +107,10 @@ describe('per-user container isolation', () => {
     const started = await startAndLog(cA, USER_A, 'A workout');
     const workA = await cA.outstandingWork();
     expect(workA.outbox).toBeGreaterThan(0);
-    // unsynced work -> the sign-out policy RETAINS A's file (nothing discarded)
-    expect(decideSignOutDisposition(workA).dropLocalDb).toBe(false);
+    // unsynced work -> a user-initiated sign-out PROMPTS (never auto-drops); an
+    // involuntary end RETAINS. Neither drops A's file. (CE-R5 v2)
+    expect(decideSignOutDisposition('user_initiated', workA).action).toBe('prompt');
+    expect(decideSignOutDisposition('session_expired', workA).action).toBe('retain');
     await cA.dispose();
 
     const cB = await assembleContainer(USER_B, deps(createTestDb(fileFor(USER_B))));

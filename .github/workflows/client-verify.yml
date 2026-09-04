@@ -19,10 +19,13 @@ on:
     paths:
       - "client/**"
       - ".github/workflows/client-verify.yml"
+  # No path filter on pull_request: `full-app-typecheck` + `logic-tests` are
+  # REQUIRED status checks on `main` (CE-R6 / DEC-53, 2026-09-04). A strict
+  # required check whose workflow never runs stays "Expected — waiting" and
+  # blocks merge, so a non-client PR (e.g. a governance-only sync) would
+  # deadlock if this were path-filtered. Run on every PR — non-weakening (same
+  # jobs, run more often), matching db-verify.yml (CE-DEC-08).
   pull_request:
-    paths:
-      - "client/**"
-      - ".github/workflows/client-verify.yml"
   workflow_dispatch:
 
 permissions:

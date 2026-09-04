@@ -31,6 +31,8 @@ import {
   decideAccountAction,
   decideSignOutDisposition,
   GenerationGuard,
+  type SignOutCause,
+  type SignOutChoice,
 } from './account-lifecycle';
 import { AuthFlow } from '@/features/auth/auth-flow';
 import type { OnboardingInput, OnboardingDraft } from '@/features/onboarding/onboarding-service';
@@ -71,7 +73,7 @@ export type AuthContextValue = {
   user: AuthUser | null;
   /** transient container-init failure — the root shows a retry affordance */
   initError: string | null;
-  /** a sign-out kept the local DB because unsynced work would have been lost */
+  /** an involuntary session end (expiry / account switch) kept the local DB */
   unsyncedNotice: boolean;
   dismissUnsyncedNotice(): void;
   retryInit(): void;
@@ -80,7 +82,19 @@ export type AuthContextValue = {
   signUp(email: string, password: string, confirm: string): ReturnType<AuthFlow['signUp']>;
   sendPasswordReset(email: string): ReturnType<AuthFlow['sendPasswordReset']>;
   resetPassword(pw: string, confirm: string): ReturnType<AuthFlow['resetPassword']>;
+  /**
+   * Start a user-initiated sign-out. With nothing outstanding this signs out and
+   * drops the per-user DB. With outstanding work it does NOT sign out yet — it
+   * freezes local writes and exposes `signOutPrompt`; the screen then calls
+   * `resolveSignOutPrompt` (CE-R5 v2 / DEC-53).
+   */
   signOut(): Promise<void>;
+  /** non-null while the dirty user-initiated sign-out sheet is open */
+  signOutPrompt: { outbox: number; openConflicts: number } | null;
+  /** resolve the sheet. `cancel` restores writes and stays signed in. */
+  resolveSignOutPrompt(choice: 'backup' | 'keep' | 'discard' | 'cancel'): Promise<void>;
+  /** called by the (future) delete-account flow AFTER a confirmed server deletion */
+  confirmAccountDeleted(): Promise<void>;
   /** apply an inbound email-confirm / password-recovery deep link */
   handleAuthDeepLink(url: string): Promise<void>;
 
@@ -139,12 +153,21 @@ export function RuntimeProvider({
 }: RuntimeProviderProps) {
   const [phase, setPhase] = useState<InternalPhase>({ kind: 'bootstrapping' });
   const [unsyncedNotice, setUnsyncedNotice] = useState(false);
+  const [signOutPrompt, setSignOutPrompt] = useState<{ outbox: number; openConflicts: number } | null>(
+    null,
+  );
 
   // --- stable singletons ---------------------------------------------------
   const guardRef = useRef(new GenerationGuard());
   const activeRef = useRef<{ userId: string; container: AppContainer } | null>(null);
   const chainRef = useRef<Promise<void>>(Promise.resolve());
   const mountedRef = useRef(true);
+  /** why the NEXT retire is happening. Defaults to involuntary; a user action
+   *  sets it to 'user_initiated' just before calling the provider sign-out.
+   *  Reset after every retire so a later refresh-failure SIGNED_OUT is treated
+   *  as involuntary (CE-R5 v2). */
+  const signOutCauseRef = useRef<SignOutCause>('session_expired');
+  const signOutChoiceRef = useRef<SignOutChoice | undefined>(undefined);
 
   const buildFn = buildContainer ?? nativeBuildContainer;
   const dropFn = dropDatabase ?? deleteUserDatabase;
@@ -165,20 +188,30 @@ export function RuntimeProvider({
     if (mountedRef.current) setPhase(p);
   };
 
-  const retire = async (userId: string): Promise<void> => {
+  const retire = async (
+    userId: string,
+    cause: SignOutCause,
+    choice?: SignOutChoice,
+  ): Promise<void> => {
     const active = activeRef.current;
     activeRef.current = null;
+    // reset the intent for the NEXT retire (default = involuntary)
+    signOutCauseRef.current = 'session_expired';
+    signOutChoiceRef.current = undefined;
+    if (mountedRef.current) setSignOutPrompt(null);
     if (!active) return;
-    let kept = false;
+    let notify = false;
     try {
       const work = await active.container.outstandingWork();
-      const disp = decideSignOutDisposition(work);
+      const disp = decideSignOutDisposition(cause, work, choice);
       await active.container.dispose();
-      if (disp.dropLocalDb) {
+      if (disp.action === 'drop') {
         await dropFn(active.userId);
+        consoleLogger.log('info', 'runtime.signout.drop_db', { cause, reason: disp.reason });
       } else {
-        kept = true;
-        consoleLogger.log('warn', 'runtime.signout.retain_db', { reason: disp.reason });
+        // 'retain' — and defensively 'prompt' too: NEVER drop on an unexpected path
+        notify = disp.action === 'retain' ? disp.notify : true;
+        consoleLogger.log('warn', 'runtime.signout.retain_db', { cause, reason: disp.reason });
       }
     } catch (err) {
       consoleLogger.log('error', 'runtime.retire.failed', {
@@ -186,7 +219,7 @@ export function RuntimeProvider({
       });
     }
     void userId;
-    if (mountedRef.current) setUnsyncedNotice(kept);
+    if (mountedRef.current) setUnsyncedNotice(notify);
   };
 
   const activate = async (userId: string, gen: number): Promise<void> => {
@@ -265,13 +298,14 @@ export function RuntimeProvider({
         }
         case 'retire': {
           guardRef.current.bump();
-          await retire(action.retire);
+          await retire(action.retire, signOutCauseRef.current, signOutChoiceRef.current);
           safeSetPhase({ kind: 'signed-out' });
           return;
         }
         case 'retire-then-activate': {
           const gen = guardRef.current.bump();
-          await retire(action.retire);
+          // an account switch is involuntary for A — always retain A's DB
+          await retire(action.retire, 'account_switch');
           if (!guardRef.current.isCurrent(gen)) return;
           noopAnalytics.track({ name: 'account_switched' });
           await activate(action.userId, gen);
@@ -325,8 +359,66 @@ export function RuntimeProvider({
       sendPasswordReset: (e) => flow.sendPasswordReset(e),
       resetPassword: (p, c) => flow.resetPassword(p, c),
       signOut: async () => {
+        const active = activeRef.current;
+        if (!active) {
+          await flow.signOut();
+          return;
+        }
+        const work = await active.container.outstandingWork();
+        const disp = decideSignOutDisposition('user_initiated', work);
+        if (disp.action === 'prompt') {
+          // outstanding work — do NOT sign out yet; freeze writes and surface the
+          // choice so Cancel can leave the session intact (CE-R5 v2).
+          active.container.setWritesFrozen(true);
+          if (mountedRef.current) setSignOutPrompt(work);
+          return;
+        }
+        signOutCauseRef.current = 'user_initiated';
+        signOutChoiceRef.current = undefined;
         await flow.signOut();
-        // the fake dev port may not emit; force a retire if still active
+        if (activeRef.current) void run({ type: 'SIGNED_OUT' });
+      },
+      signOutPrompt,
+      resolveSignOutPrompt: async (choice) => {
+        const active = activeRef.current;
+        if (!active) {
+          if (mountedRef.current) setSignOutPrompt(null);
+          return;
+        }
+        if (choice === 'cancel') {
+          active.container.setWritesFrozen(false);
+          if (mountedRef.current) setSignOutPrompt(null);
+          return;
+        }
+        if (choice === 'backup') {
+          // keep writes frozen; one final drain, then re-check BOTH outbox and conflicts
+          await active.container.sync.requestSync('manual').catch(() => {});
+          const work2 = await active.container.outstandingWork();
+          if (work2.outbox === 0 && work2.openConflicts === 0) {
+            signOutCauseRef.current = 'user_initiated';
+            signOutChoiceRef.current = undefined; // clean → drop
+            if (mountedRef.current) setSignOutPrompt(null);
+            await flow.signOut();
+            if (activeRef.current) void run({ type: 'SIGNED_OUT' });
+          } else {
+            // still not clean — stay on the sheet with the residual count, still frozen
+            if (mountedRef.current) setSignOutPrompt(work2);
+          }
+          return;
+        }
+        // 'keep' | 'discard' — the screen has already taken the second confirm for discard
+        active.container.setWritesFrozen(false);
+        signOutCauseRef.current = 'user_initiated';
+        signOutChoiceRef.current = choice;
+        if (mountedRef.current) setSignOutPrompt(null);
+        await flow.signOut();
+        if (activeRef.current) void run({ type: 'SIGNED_OUT' });
+      },
+      confirmAccountDeleted: async () => {
+        if (!activeRef.current) return;
+        signOutCauseRef.current = 'account_deleted';
+        signOutChoiceRef.current = undefined;
+        await flow.signOut().catch(() => {}); // server graph already gone; local drop is authoritative
         if (activeRef.current) void run({ type: 'SIGNED_OUT' });
       },
       handleAuthDeepLink: async (url: string) => {
@@ -350,7 +442,7 @@ export function RuntimeProvider({
       },
       flow,
     };
-  }, [phase, unsyncedNotice, flow]);
+  }, [phase, unsyncedNotice, signOutPrompt, flow]);
 
   return (
     <RuntimeContext.Provider value={publicState}>

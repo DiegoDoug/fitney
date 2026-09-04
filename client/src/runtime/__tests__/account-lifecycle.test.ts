@@ -79,22 +79,64 @@ describe('GenerationGuard', () => {
   });
 });
 
-describe('decideSignOutDisposition (interim policy)', () => {
-  it('clean sign-out (nothing outstanding) -> drop the local DB', () => {
-    expect(decideSignOutDisposition({ outbox: 0, openConflicts: 0 })).toMatchObject({
-      dropLocalDb: true,
-      hasUnsyncedWork: false,
+describe('decideSignOutDisposition (CE-R5 v2 / DEC-53)', () => {
+  const clean = { outbox: 0, openConflicts: 0 };
+  const dirtyOutbox = { outbox: 3, openConflicts: 0 };
+  const dirtyConflict = { outbox: 0, openConflicts: 1 };
+
+  it('user-initiated + nothing outstanding -> drop', () => {
+    expect(decideSignOutDisposition('user_initiated', clean)).toEqual({
+      action: 'drop',
+      reason: 'user_signout_clean',
     });
   });
 
-  it('unsynced outbox entries -> RETAIN the DB, never silently discard', () => {
-    expect(decideSignOutDisposition({ outbox: 3, openConflicts: 0 })).toMatchObject({
-      dropLocalDb: false,
-      hasUnsyncedWork: true,
+  it('user-initiated + outstanding work + NO choice -> prompt (never auto-decides)', () => {
+    expect(decideSignOutDisposition('user_initiated', dirtyOutbox)).toMatchObject({
+      action: 'prompt',
+      outstanding: dirtyOutbox,
+    });
+    expect(decideSignOutDisposition('user_initiated', dirtyConflict).action).toBe('prompt');
+  });
+
+  it('user-initiated + choice "keep" -> retain (no notice — chosen)', () => {
+    expect(decideSignOutDisposition('user_initiated', dirtyOutbox, 'keep')).toEqual({
+      action: 'retain',
+      notify: false,
+      reason: 'user_keep_on_device',
     });
   });
 
-  it('unresolved conflicts also force retention', () => {
-    expect(decideSignOutDisposition({ outbox: 0, openConflicts: 1 }).dropLocalDb).toBe(false);
+  it('user-initiated + choice "discard" -> drop (explicit informed discard)', () => {
+    expect(decideSignOutDisposition('user_initiated', dirtyOutbox, 'discard')).toEqual({
+      action: 'drop',
+      reason: 'user_discard_confirmed',
+    });
+  });
+
+  it('session_expired -> ALWAYS retain + notify, even with a clean outbox', () => {
+    expect(decideSignOutDisposition('session_expired', clean)).toMatchObject({ action: 'retain', notify: true });
+    expect(decideSignOutDisposition('session_expired', dirtyOutbox)).toMatchObject({ action: 'retain', notify: true });
+  });
+
+  it('account_switch -> ALWAYS retain + notify (involuntary for account A)', () => {
+    expect(decideSignOutDisposition('account_switch', dirtyConflict)).toMatchObject({ action: 'retain', notify: true });
+  });
+
+  it('account_deleted (confirmed) -> drop unconditionally', () => {
+    expect(decideSignOutDisposition('account_deleted', dirtyOutbox)).toEqual({
+      action: 'drop',
+      reason: 'account_deleted_confirmed',
+    });
+  });
+
+  it('there is no time-based / automatic deletion path — deterministic in (cause, work, choice)', () => {
+    // regression guard for the v1 "30-day" gap: outstanding work is retained until
+    // reconciliation or an explicit choice, never by elapsed time. The signature
+    // takes no clock, and repeated calls are byte-identical.
+    const a = decideSignOutDisposition('user_initiated', dirtyOutbox);
+    const b = decideSignOutDisposition('user_initiated', dirtyOutbox);
+    expect(a).toEqual(b);
+    expect(a.action).toBe('prompt'); // outstanding work is never auto-dropped
   });
 });

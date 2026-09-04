@@ -33,3 +33,16 @@ export class PersistFailedError extends DomainError {
     this.name = 'PersistFailedError';
   }
 }
+
+/**
+ * A mutation was attempted while the per-user runtime had local writes frozen
+ * (CE-R5 v2 — the "Back up & sign out" final check). Reads are unaffected. The
+ * freeze is strictly scoped to that attempt and is lifted on failure / Cancel /
+ * fallback (docs/engineering/client-implementation.md §14.12 condition 1).
+ */
+export class WritesFrozenError extends DomainError {
+  constructor(message = 'Local writes are paused while backing up before sign-out') {
+    super('writes_frozen', message);
+    this.name = 'WritesFrozenError';
+  }
+}

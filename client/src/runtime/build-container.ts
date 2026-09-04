@@ -38,6 +38,15 @@ export type AppContainer = {
   onboarding: OnboardingService;
   /** count of local work not yet acknowledged by the server (outbox + conflicts) */
   outstandingWork(): Promise<{ outbox: number; openConflicts: number }>;
+  /**
+   * CE-R5 v2 (DEC-53): pause / resume the FEATURE write path (methods that
+   * enqueue a `sync_outbox` entry) so no new outbound mutation can be created
+   * during the "Back up & sign out" final check. Strictly scoped to that
+   * attempt; the caller MUST unfreeze on failure / Cancel / fallback. Reads and
+   * the sync engine's own writes are unaffected.
+   */
+  setWritesFrozen(frozen: boolean): void;
+  writesFrozen(): boolean;
   /** retire this runtime: stop sync, close the DB handle. Idempotent. */
   dispose(): Promise<void>;
 };
@@ -57,7 +66,13 @@ export type ContainerDeps = {
 export async function assembleContainer(userId: string, d: ContainerDeps): Promise<AppContainer> {
   await migrate(d.db);
 
-  const repos = createLocalRepositories({ db: d.db, clock: d.clock, ids: d.ids });
+  let writesFrozen = false;
+  const repos = createLocalRepositories({
+    db: d.db,
+    clock: d.clock,
+    ids: d.ids,
+    isFrozen: () => writesFrozen,
+  });
   const sync = new SyncEngine({
     db: d.db,
     gateway: d.gateway,
@@ -102,6 +117,12 @@ export async function assembleContainer(userId: string, d: ContainerDeps): Promi
         `SELECT COUNT(*) AS n FROM sync_conflicts WHERE resolved_at IS NULL`,
       );
       return { outbox: obx?.n ?? 0, openConflicts: cf?.n ?? 0 };
+    },
+    setWritesFrozen(frozen: boolean) {
+      writesFrozen = frozen;
+    },
+    writesFrozen() {
+      return writesFrozen;
     },
     async dispose() {
       if (disposed) return;

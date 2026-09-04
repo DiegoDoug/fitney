@@ -19,7 +19,7 @@ import type {
   WorkoutSession,
 } from '@/domain/entities';
 import type { DerivedRows, SetFact } from '@/domain/pr';
-import { ActiveSessionExistsError } from '@/domain/errors';
+import { ActiveSessionExistsError, WritesFrozenError } from '@/domain/errors';
 import type { Uuid } from '@/domain/ids';
 import type {
   DerivedRepository,
@@ -31,18 +31,36 @@ import type {
   SessionRepository,
 } from '@/data/repositories/types';
 
-type Deps = { db: SqlDatabase; clock: Clock; ids: IdGenerator };
+type Deps = {
+  db: SqlDatabase;
+  clock: Clock;
+  ids: IdGenerator;
+  /**
+   * CE-R5 v2 (DEC-53): when this returns true, the FEATURE write path (every
+   * method that enqueues a `sync_outbox` entry) is paused so no new outbound
+   * mutation can be created during the "Back up & sign out" final check. Reads,
+   * the sync engine's own writes (it does not go through these repos), local-only
+   * markers, and pull-apply (`bulkPut` / `derived.apply`) are unaffected.
+   */
+  isFrozen?: () => boolean;
+};
 
 const NEW_ROW_META = { version: 1, synced_version: null, dirty: 1 as const };
 
+/** Guard the feature write path while local writes are frozen (CE-R5 v2). */
+function assertWritable(isFrozen: (() => boolean) | undefined): void {
+  if (isFrozen?.()) throw new WritesFrozenError();
+}
+
 // ---------------------------------------------------------------- profile
-function profileRepo({ db, clock, ids }: Deps): ProfileRepository {
+function profileRepo({ db, clock, ids, isFrozen }: Deps): ProfileRepository {
   return {
     async get(userId) {
       const r = await getRowById<Record<string, unknown>>(db, 'profiles', userId);
       return r ? fromDbRow<Profile>(r) : null;
     },
     async upsert(userId, profile) {
+      assertWritable(isFrozen);
       const now = clock.now();
       await runInTransaction(db, () =>
         enqueueMutation({
@@ -152,7 +170,7 @@ function exerciseRepo({ db }: Deps): ExerciseRepository {
 }
 
 // ---------------------------------------------------------------- session
-function sessionRepo({ db, clock, ids }: Deps): SessionRepository {
+function sessionRepo({ db, clock, ids, isFrozen }: Deps): SessionRepository {
   return {
     async getActive(userId) {
       const r = await db.getFirstAsync<Record<string, unknown>>(
@@ -183,6 +201,7 @@ function sessionRepo({ db, clock, ids }: Deps): SessionRepository {
       return rows.map((r) => fromDbRow<SessionExercise>(r));
     },
     async createActive(userId, session, exercises) {
+      assertWritable(isFrozen);
       const now = clock.now();
       // one-active-session guard (FR-LOG-12) — DB partial-unique index backs this up
       const active = await db.getFirstAsync<{ id: string }>(
@@ -215,6 +234,7 @@ function sessionRepo({ db, clock, ids }: Deps): SessionRepository {
       });
     },
     async setStatus(userId, sessionId, status, endedAtIso) {
+      assertWritable(isFrozen);
       const now = clock.now();
       const cur = await getRowById<Record<string, unknown>>(db, 'workout_sessions', sessionId);
       if (!cur) return;
@@ -232,6 +252,7 @@ function sessionRepo({ db, clock, ids }: Deps): SessionRepository {
       );
     },
     async setRestTimerAnchor(userId, sessionId, anchorIso) {
+      assertWritable(isFrozen);
       const now = clock.now();
       const cur = await getRowById<Record<string, unknown>>(db, 'workout_sessions', sessionId);
       if (!cur) return;
@@ -251,7 +272,7 @@ function sessionRepo({ db, clock, ids }: Deps): SessionRepository {
 }
 
 // ------------------------------------------------------------ performed set
-function performedSetRepo({ db, clock, ids }: Deps): PerformedSetRepository {
+function performedSetRepo({ db, clock, ids, isFrozen }: Deps): PerformedSetRepository {
   return {
     async listBySession(sessionId) {
       const rows = await db.getAllAsync<Record<string, unknown>>(
@@ -264,6 +285,7 @@ function performedSetRepo({ db, clock, ids }: Deps): PerformedSetRepository {
       return rows.map((r) => fromDbRow<PerformedSet>(r));
     },
     async upsert(userId, set) {
+      assertWritable(isFrozen);
       const now = clock.now();
       await runInTransaction(db, () =>
         enqueueMutation({
@@ -278,6 +300,7 @@ function performedSetRepo({ db, clock, ids }: Deps): PerformedSetRepository {
       );
     },
     async remove(userId, setId) {
+      assertWritable(isFrozen);
       const now = clock.now();
       const cur = await getRowById<Record<string, unknown>>(db, 'performed_sets', setId);
       if (!cur) return;
