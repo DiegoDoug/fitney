@@ -1,14 +1,15 @@
 # Client Implementation — Fitney
 
-> **Status: Phase 5 IN PROGRESS — increment 1 awaiting review. This is NOT a phase
-> submission and does not seek Phase 5 approval.** The Foundation exit gate
-> (SPEC §18) is **not** met: authentication, onboarding, and per-user SQLite
-> isolation are unfinished; screens are not device-verified; sync is not verified
-> against real Supabase. Human assessment 2026-09-03 requested revisions on PR #1
-> (full-app typecheck as a CI gate — done in this pass) and correct lifecycle
-> framing before any merge. This artifact grows increment by increment until the
-> Foundation gate is met and the offline-logging vertical slice is device- and
-> hosted-verified.
+> **Status: Phase 5 IN PROGRESS — increment 2 ready for review (branch
+> `phase-5/auth-isolation`). This is NOT a phase submission and does not seek
+> Phase 5 approval.** Increment 1 merged via PR #1 (squash, 2026-09-04). The
+> Foundation exit gate (SPEC §18) is **still not met**: auth / onboarding / per-
+> user SQLite isolation are now *implemented and logic-verified* but **not**
+> device-verified, **not** verified against real hosted GoTrue, and the
+> offline-logging slice is not device-tested (WORK-007 / WORK-010 / WORK-013
+> remain open). This artifact grows increment by increment until the Foundation
+> gate is met and the offline-logging vertical slice is device- and hosted-
+> verified. Increment-2 detail is **§14**.
 
 ## 1. Phase identity
 
@@ -284,3 +285,118 @@ Planning / Progress / Library expansion and phases 9–11 stay on hold throughou
 - `development-roadmap.md`: lifecycle row 5 → **`IN PROGRESS`** (result `—`, "increment 1 in review, not a phase submission, Foundation exit gate not met"); artifact registry entries → `IN PROGRESS`; add `client/`; WORK-020 → *matching-vector evidence; hosted cross-run still required*; WORK-011 (boundary lint) → `DONE`; WORK-010 / WORK-013 / WORK-007 / WORK-008 / WORK-017 → carry with owners; CE-DEC-01…08; CE-RISK-1…3; human review log → **REVISIONS REQUESTED** (increment 1, not a phase submission); TASK-7 → `Done`; validator re-run → PASS.
 - Notion (canonical): Reviews & Verification entry *"Phase 5 — Client engineering: Foundation gate + offline-logging logic layers"* → **retitled/reframed as an increment-1 review with REVISIONS REQUESTED**; REL-5 milestone → `Active` (Phase 5 in progress); TASK-7 → `Done` (branch protection verified, repo public). CE-DEC-01…08 enumerated for formalization into the Decisions DB.
 - `.project-memory/` regenerated from Notion and validated (`validate_system.py` PASS, `npm run check` OK).
+
+---
+
+## 14. Increment 2 — Authentication → per-user SQLite isolation → onboarding
+
+- Execution date: 2026-09-04
+- Branch: `phase-5/auth-isolation` → PR to `main` (this increment). **Not a phase submission.**
+- Authorization: explicit human instruction to execute Phase 5 increment 2 only (scope: authentication → per-user SQLite isolation → onboarding; Phase 5 stays IN PROGRESS).
+- Classification: **CREATE** (auth/onboarding/isolation seams existed only as stubs in increment 1 — `RuntimeProvider` booted from an injected `userId`; `session-storage.ts` + `client.ts` were wired but not driven).
+- Upstream relied on: `security-identity` (REV-10, APPROVED WITH CONDITIONS) §5 SEC-REQ-AUTH-01…05 / SEC-REQ-AZ-01; `evidence-based-ui-ux` §10 state matrix + §10.6 back/recovery; `visual-ui-design` §6–§7 tokens/components; `software-architecture` ADR-0009 + system-architecture §6.4; SPEC §6.1 AUTH-01…05, §18 Phase 0.
+
+### 14.1 Preflight findings
+
+| # | Finding | Action |
+|---|---|---|
+| P-1 | PR #1 **merged** (squash) 2026-09-04; `origin/main` @ `625c6a5`; local tree identical to `origin/main` (squash pre-image). | Branched `phase-5/auth-isolation` from `origin/main`. Working tree clean. Nothing merged automatically. |
+| P-2 | **Required-merge-check discrepancy.** The `Protect Main` ruleset (id 22205300, active, `bypass_actors: []`) requires **only `db-verify`** as a required status check (strict). `client-verify.yml` jobs `full-app-typecheck` + `logic-tests` run on every client PR (they will report green on this PR) but are **advisory** — not in `required_status_checks`. Canonical Notion TASK-7 only ever scoped `db-verify`. The instruction's expectation ("full-app-typecheck, logic-tests … remain required merge checks") is **not currently true**. | **Not fixed** (branch-protection / security setting, `platform-release`-owned, needs a human). Routed as **CE-R6** — add contexts `full-app-typecheck` + `logic-tests` to the ruleset (extends CE-R1). |
+| P-3 | `expo-doctor` (installed toolchain) flagged: (a) missing peer dep `react-native-worklets` (Reanimated 4 split it out — "app may crash outside Expo Go"); (b) `react-native` patch drift `0.81.4` → SDK-54-expected `0.81.5`. Both pre-existing on `main` (increment 1). | Remediated with **`npx expo install`** (the mandated version-selection path — SDK 54, not an SDK upgrade, `legacy-peer-deps` not used as evidence): `react-native-worklets@0.5.1` added; `react-native` → `0.81.5`. After: `expo install --check` clean, `expo-doctor` **18/18**. `@supabase/supabase-js` unchanged (`2.112.4`, only alphabetised by the tool). On-device runtime verification of the RN bump still belongs to WORK-010. `npm audit` reports 25 advisories (1 critical / 11 high / 13 moderate) in the transitive RN/Expo dev toolchain — pre-existing, not chased (fix requires breaking changes); noted for `platform-release` / `quality-engineering`. |
+| P-4 | Baseline gates on the fresh branch: full-app `tsc` PASS, logic `tsc` PASS, `depcruise` 0 errors (1 pre-existing `no-orphans` warn), `jest` 40/40. | Recorded as the pre-implementation baseline. |
+
+### 14.2 What was delivered (paths under `client/`)
+
+| Area | Paths | Notes |
+|---|---|---|
+| **AuthPort seam (pure)** | `src/services/auth.ts`, `src/services/index.ts` (+`Services.auth`) | `AuthPort` interface (ADR-0009 `services/AuthProvider`); `AuthUser/AuthSession/AuthChange`; provider-agnostic `AuthErrorCode` + `classifyAuthError` + `authErrorMessage`; `ENUMERATION_SENSITIVE` set + neutral copy (SEC-REQ-AUTH-03); `validateEmail/Password`, `validateSignIn/SignUpForm`; `parseAuthUrl` (recovery/PKCE deep links); `createFakeAuth` (deterministic, emits `INITIAL_SESSION` on subscribe). No token/email/password is logged from here. |
+| **GoTrue gateway (the only `@supabase` auth caller)** | `src/data/remote/auth-gateway.ts` | `createSupabaseAuthPort(sb, { redirectTo })`: `signUp/signInWithPassword/signOut/resetPasswordForEmail/updateUser`, `onAuthStateChange` → `AuthChange`, `handleDeepLink` → `setSession` / `exchangeCodeForSession`. Session persistence / restoration / auto-refresh come from the existing `data/remote/client.ts` (`storage: secureSessionStorage` = `expo-secure-store` chunked, `autoRefreshToken`, `persistSession`). Excluded from `tsconfig.logic.json`; typechecked in the full-app CI job. Boundary lint: `only-remote-imports-supabase` satisfied (no `@supabase` import outside `data/remote`). |
+| **Auth feature wrapper** | `src/features/auth/auth-flow.ts` | `AuthFlow` — screen-facing `{ ok } | { ok:false, code, message, enumerationSensitive }` results; uniform password-reset copy; maps `AuthError` + raw provider errors; sanitised logging/analytics only (`signed_in` / `signed_out`). `features/*` depends on the `AuthPort` *interface*; the concrete gateway is injected at the root. |
+| **Per-user composition (logic-safe)** | `src/runtime/build-container.ts` | `assembleContainer(userId, deps)` — injectable `db` + `SyncGatewayPort`; wires `migrate → repos → SyncEngine → SessionService/SetService/ExerciseSearch/OnboardingService`. `AppContainer` gains `userId`, `onboarding`, `outstandingWork()` (outbox + open conflicts), `dispose()` (stop sync, close the handle; idempotent). Moving the wiring here is what makes isolation testable without the RN toolchain. |
+| **Account lifecycle (pure)** | `src/runtime/account-lifecycle.ts` | `decideAccountAction(activeUserId, AuthChange)` → `activate | retire | retire-then-activate | ignore | recovery` — distinguishes a real `SIGNED_OUT` / account change from `TOKEN_REFRESHED` / `USER_UPDATED` (same user → no teardown) and from a mere loss of connectivity (no event). `GenerationGuard` (`bump()`/`isCurrent()`) — a late async result from account A is inert once the runtime moved on. `decideSignOutDisposition(work)` — **interim** unsynced-work policy (see §14.4 / CE-R5). |
+| **Runtime driver** | `src/runtime/context.tsx` (rewritten), `src/runtime/container.ts` (native), `src/data/local/driver.native.ts` (`deleteDatabase`), `src/data/sync/engine.ts` (`stop()`/`isStopped()`) | `RuntimeProvider` subscribes to `AuthPort`, runs transitions on a **serialized promise chain** (A and B never interleave), stamps every build with a generation, disposes a stale build, gates onboarding, kicks a first non-blocking sync (and promotes onboarding→ready if a hydrate pulls a server-synced profile), clears account-scoped UI state by unmounting the tab tree on `signed-out`. `useRuntime()` keeps its original 3-state contract (`loading | signed-out | ready`) so existing tab/workout screens are untouched; new `useAuth()` / `useOnboarding()` expose the richer state. `SyncEngine.stop()` makes `requestSync` inert (no protocol change; the engine owns no timers). Clean sign-out drops the per-user file via `SQLite.deleteDatabaseAsync` (in `data/local`, not `runtime`, to satisfy `only-local-imports-sqlite-driver`). DEV-only `EXPO_PUBLIC_DEV_USER_ID` (non-production builds) boots a seeded user with a local-only fake session — an explicit env opt-in, **not** an implicit guest fallback (AUTH-04). |
+| **Onboarding gate (local-only marker)** | `src/data/local/schema/migrations.ts` (`m0002`), `src/data/local/repositories.ts`, `src/data/repositories/types.ts`, `src/test/schema-parity.test.ts` | `m0002` = additive `ALTER TABLE profiles ADD COLUMN onboarding_completed_at INTEGER` — a **local-only** marker in the `dirty`/`synced_version`/`local_updated_at` family; added to `stripLocalMeta` + `schema-parity` `LOCAL_ONLY`. `ProfileRepository.getOnboardingState` (`profileExists`/`completed`/`serverSynced`/prefill `draft`) + `markOnboardingComplete` (set-once `COALESCE`, **never** enqueues an outbox op). |
+| **Onboarding feature** | `src/features/onboarding/onboarding-service.ts`, `src/services/analytics.ts` (`onboarding_completed` etc.) | `OnboardingService.getState` / `submit(userId, input)`. `submit` writes the profile through the **existing** contract — `ProfileRepository.upsert` = local `profiles` row + `profile` outbox upsert, atomic → `sync_apply` under RLS `profile_insert with check (id = auth.uid())` (no server signup trigger exists; the client owns first-write of its own profile). Idempotent (outbox coalesces; marker set-once). Resumable (partial row → prefilled `draft`). Hydrate (a server-synced row ⇒ `complete`, form skipped). `OnboardingInput` = display name, unit, week start, default rest, optional goal — **only** the AUTH-03 fields. |
+| **Screens** | `app/(auth)/{_layout,welcome,sign-in,sign-up,forgot-password,reset-password,onboarding}.tsx`, `app/settings.tsx`, `app/_layout.tsx` (rewritten routing + deep-link), `app/(tabs)/index.tsx` (Settings link) | `AuthRouter` in the root redirects by phase: `signed-out`/`authenticating` → `(auth)/welcome`, `recovery` → `reset-password`, `onboarding` → `(auth)/onboarding`, `ready` → `(tabs)`; `error` → inline retry screen. Deep links (`fitney://…#access_token=…&type=recovery` / `?code=…`) routed to `handleAuthDeepLink`. `redirectTo` = `Linking.createURL('/auth/callback')` — **must be allow-listed in Supabase Auth settings** (hosted config → `platform-release`, SEC-C2). Screen states: bootstrapping, submitting (spinner + disabled), field validation, form-level failure banner (neutral copy), confirm-email, uniform reset confirmation, container-init error + retry. Sign-out lives in `app/settings.tsx`. |
+| **Form primitives** | `src/components/ui.tsx` | `AppTextField` (always-visible label, ≥48 dp, error = border-weight + glyph + text, not hue alone — VIS-DEC-06), `FieldError`, `FormBanner` (`error`/`success`/`info`, `accessibilityRole="alert"` for errors), `SegmentedControl` (selected = border + fill + ✓ + weight; `radiogroup`/`radio`; ≥48 dp), `NumberStepper` (−/value/+, ≥48 dp targets, tabular value). |
+
+### 14.3 Verification performed (all from `client/`)
+
+| Gate | Command | Result |
+|---|---|---|
+| Strict TypeScript — **full app** | `npx tsc --noEmit -p tsconfig.json` | **PASS** (0 errors) |
+| Strict TypeScript — logic layers (`src/runtime/**` added to the logic project; `container.ts` excluded) | `npx tsc --noEmit -p tsconfig.logic.json` | **PASS** (0 errors) |
+| Dependency-boundary rule (ADR-0002) | `npx depcruise src app --config .dependency-cruiser.cjs` | **PASS** — 0 errors, 1 pre-existing `no-orphans` warn (`features/logging/rest-timer.ts`). One violation caught + fixed mid-work (`runtime/container.ts` imported `expo-sqlite` directly → moved `deleteDatabase` into `data/local/driver.native.ts`). |
+| Logic + sync + migration + WORK-020 + **auth/isolation/onboarding** suites | `npx jest --config jest.config.cjs --ci` | **PASS** — **15 suites, 98/98** (40 prior + 58 new). Driver = `better-sqlite3`; sync = `FakeGateway`; auth = `createFakeAuth`. **NOT** the Expo SQLite runtime, **NOT** real Supabase/GoTrue, **NOT** a device. |
+| Expo dependency check | `npx expo install --check` | **Dependencies are up to date** (after §14.1 P-3) |
+| Expo Doctor (installed toolchain) | `npx expo-doctor@1.20.4` | **18/18 checks passed** (after §14.1 P-3) |
+
+#### New test inventory (against the increment-2 verification list)
+
+| Required coverage | File | Layer |
+|---|---|---|
+| Session persistence / restoration / refresh / storage failure | `createFakeAuth` restore + `INITIAL_SESSION` (`src/services/__tests__/auth.test.ts`); **storage-failure + real token refresh against hosted GoTrue is deferred** (§14.4 L-2c) | mocked logic; hosted = deferred |
+| Sign-in failure, sign-out, password-recovery state transitions | `src/features/auth/__tests__/auth-flow.test.ts`, `src/services/__tests__/auth.test.ts` | mocked logic |
+| Account A → B → A isolation across rows, outbox, cursors, conflicts, cached UI | `src/runtime/__tests__/account-isolation.test.ts` (`A→B` separation; `A→B→A` over a **retained file** with a fresh handle; cached UI = unmount on `signed-out`) | real local SQLite (better-sqlite3) |
+| A delayed account-A response arriving after switching to B | `account-isolation.test.ts` ("a late result from account A cannot be applied after the runtime moved to B" — `GenerationGuard`) + `account-lifecycle.test.ts` | real local SQLite + pure |
+| Repeated auth events / overlapping account transitions | `account-lifecycle.test.ts` (`decideAccountAction` matrix: same-user `SIGNED_IN`/`TOKEN_REFRESHED`/`USER_UPDATED` → `ignore`; `SIGNED_OUT` while out → `ignore`) + `account-isolation.test.ts` ("dispose idempotent; repeated activation over the same file") | pure + real local SQLite |
+| Offline relaunch for a previously authenticated user | `account-isolation.test.ts` ("offline relaunch … still reads/writes locally" — `indicator: 'offline'`, `gateway.applyLog` empty, local set add works) | real local SQLite |
+| Unsynced-change handling at sign-out | `account-lifecycle.test.ts` (`decideSignOutDisposition`) + `account-isolation.test.ts` (`outstandingWork().outbox > 0` ⇒ `dropLocalDb === false`) | pure + real local SQLite |
+| Interrupted + repeated onboarding / profile initialization | `src/features/onboarding/__tests__/onboarding-service.test.ts` (resumable partial → `draft`; idempotent re-submit → 1 coalesced outbox row, marker unchanged; hydrate; validation throw), `src/data/local/__tests__/profile-onboarding.test.ts`, `src/data/local/__tests__/migrate.test.ts` (m0002 fresh + v1→v2 upgrade, existing rows survive) | mocked logic + real local SQLite |
+| Component behaviour for auth/onboarding loading / validation / failure / navigation states | screen **logic** covered via `AuthFlow` result transitions + `validate*` + `parseAuthUrl` + the phase→route table; **rendered-component (`jest-expo`) tests deferred to increment 3–4** (no `jest-expo` harness in-repo yet — consistent with §7 L-7) | mocked logic; rendered = deferred |
+
+### 14.4 Limitations & deferred work (increment 2)
+
+| # | Item | Owner / tracking |
+|---|---|---|
+| L-2c | **No hosted GoTrue evidence.** Sign-up / sign-in / confirm-email / recovery-link / token-refresh / storage-failure have not run against a real Supabase Auth instance. Needs DEP-1 **client-linked** (`EXPO_PUBLIC_SUPABASE_URL` + anon key for `fitney-dev`) **and** the `fitney://auth/callback` redirect allow-listed in the project's Auth settings **and** synthetic test accounts. Requested via secure setup (§14.6). | `client-engineering` + `platform-release` (hosted config = SEC-C2) — increment 3 |
+| L-2d | **No Expo runtime / device evidence.** The account-transition + secure-store + deep-link paths are authored, not run on a simulator or device. `expo-secure-store` chunking, `SQLite.deleteDatabaseAsync` semantics, `Linking.useURL` timing, and the RN `0.81.5` bump are unverified on-device. | WORK-007 / WORK-010 — increment 3–4; CE-C1 / CE-C3 |
+| L-2e | **`better-sqlite3` ≠ Expo SQLite.** `dispose()` closes a handle and the app re-opens the per-user file on relaunch; the retain/relaunch tests model this with file-backed better-sqlite3. The real `expo-sqlite` close/re-open + WAL behaviour is WORK-010. | WORK-010 |
+| L-2f | **Sign-out disposition is INTERIM (CE-R5).** ADR-0009 says "drop the local DB on verified sign-out"; that is unambiguous only when everything is synced. `decideSignOutDisposition` currently: clean → drop; **unsynced work → RETAIN the file** (nothing discarded), clear the session, show a non-blocking notice, reuse on next sign-in as that user. A blocking "back up first / explicit discard" confirmation UX is a **product/security owner decision** — routed. Never silently discards `pending`/`dispatched` ops. | **CE-R5** → `security-identity` + `evidence-based-ui-ux` |
+| L-2g | **Stale per-user files are not garbage-collected.** A crash during an A→B switch (B's session persisted, A's file retained) leaves A's file on disk. No leak (each file is `userId`-scoped, only re-openable by re-authenticating as A), but a janitor for orphaned files is not built. | `client-engineering` — Foundation hardening |
+| L-2h | **`PASSWORD_RECOVERY` deep-link handling is authored, not exercised.** `parseAuthUrl` is unit-tested; the end-to-end `Linking → handleDeepLink → sb.auth.setSession → PASSWORD_RECOVERY → reset-password` chain needs the hosted flow + a device. | increment 3 (with L-2c) |
+| L-2i | **SEC-RESID-1 unchanged.** `delete-account` re-auth is still the 300 s heuristic; the `delete-account` UI/flow is **not** in this increment (out of scope). Carried to before-beta. | `security-identity` + `client-engineering` |
+| L-2j | Rendered `jest-expo` component/screen tests + a11y assertions (VoiceOver/TalkBack order, Dynamic Type reflow, RTL, keyboard-avoidance on the auth forms) deferred to increment 3–4 (no jest-expo harness yet). | `client-engineering` + `quality-engineering` — WORK-007 |
+
+**This increment does not discharge the Foundation exit gate.** WORK-007, WORK-010, WORK-013 (incl. its cross-run) and WORK-020's hosted cross-run remain **open**.
+
+### 14.5 Cross-phase items routed (not decided here)
+
+| ID | Item | Routed to |
+|---|---|---|
+| **CE-R5** | Sign-out with **unsynced local work**: interim policy = retain the per-user DB + non-blocking notice (never silent discard). Owner decision needed on whether a blocking drain / explicit-discard confirmation UX is required, and whether ADR-0009's "drop on sign-out" should be reworded to "drop **once synced**". | `security-identity` + `evidence-based-ui-ux` |
+| **CE-R6** | `Protect Main` ruleset requires only `db-verify`. Add contexts `full-app-typecheck` + `logic-tests` (from `client-verify.yml`) to the required checks so the client gates are enforced, not advisory. Extends CE-R1. | `platform-release` |
+| CE-R7 | RN patch bump `0.81.4 → 0.81.5` + new dep `react-native-worklets@0.5.1` applied via `expo install` during preflight (SDK 54, non-weakening). Confirm at the pinned-dependency review; on-device runtime confirmation is WORK-010. `npm audit` toolchain advisories (1 critical / 11 high) noted. | `platform-release` + `quality-engineering` |
+| CE-R1 / CE-R2 | (carried from increment 1) `db-verify` trigger widening → `platform-release`; ISS-28 / BD-DEC-01 PG17 → `backend-data-engineering`. **Not resolved here.** | as noted |
+
+### 14.6 Secure setup requested (for increment 3 hosted Auth smoke)
+
+Needed before any real GoTrue evidence can be produced; **do not** provision or reset anything hosted without human action:
+
+1. `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY` for **`fitney-dev`** placed in `client/.env` (client-safe values only — never a service-role key).
+2. `fitney://auth/callback` (and the Expo dev-client / Expo Go variants) added to the `fitney-dev` project's **Auth → URL Configuration → Redirect URLs**.
+3. Confirm dev-env GoTrue settings: `enable_confirmations` state, leaked-password protection, user-enumeration protection (SEC-REQ-AUTH-02/03) — read-only confirmation, no changes by this phase.
+4. 2–3 **synthetic** test accounts (throwaway addresses) for the smoke — never real user credentials.
+
+### 14.7 Owned decisions (increment 2)
+
+| ID | Decision |
+|---|---|
+| **CE-DEC-09** | The `services/AuthProvider` of ADR-0009 is realised as `AuthPort` (pure interface in `services/auth.ts`) + a single GoTrue impl in `data/remote/auth-gateway.ts`. Screens never see `AuthPort` directly — auth actions are exposed through the runtime context (`useAuth`). |
+| **CE-DEC-10** | Per-user composition is split: `runtime/build-container.ts` (`assembleContainer`, logic-safe, injectable `db`+`gateway`) + `runtime/container.ts` (native `expo-sqlite`/Supabase wiring). `src/runtime/**` is added to `tsconfig.logic.json` (minus `container.ts`) so account isolation is unit-tested without the RN toolchain. |
+| **CE-DEC-11** | Account transitions run on a **serialized promise chain** with a monotonic `GenerationGuard`; a build whose generation is stale is disposed, never mounted. `TOKEN_REFRESHED`/`USER_UPDATED` for the active user are **no-ops** (not a teardown). |
+| **CE-DEC-12** | Onboarding-complete is a **local-only** `profiles.onboarding_completed_at` marker (`m0002`), set-once, never synced. `onboarded = marker set OR the row is server-synced` (the second half handles multi-device hydrate). |
+| **CE-DEC-13** | **Interim** sign-out disposition (CE-R5): clean → drop the per-user file (ADR-0009); unsynced work present → retain it + non-blocking notice. Never silently discards `pending`/`dispatched` ops. |
+| **CE-DEC-14** | Preflight dep remediation via `expo install` only (SDK 54): `react-native-worklets@0.5.1` + `react-native@0.81.5`. Not an SDK upgrade; routed for ratification (CE-R7). |
+
+### 14.8 Status
+
+**Phase 5 = `IN PROGRESS`. Increment 2 = ready for review (branch `phase-5/auth-isolation`).** Not a phase submission; does not seek Phase 5 approval. Phases 9, 10, 11 remain **LOCKED**.
+
+Delivered + verified where verifiable here: the auth seam + GoTrue gateway behind the approved boundary; the per-user runtime lifecycle (serialized activate/retire/switch, generation guard, sync stop, DB close, clean-drop vs unsynced-retain, account-scoped UI clear, crash-safe re-resolve from the persisted session); the onboarding gate + service through the existing outbox/`sync_apply` contract; all auth/onboarding screens with their loading/validation/failure/navigation states; full-app `tsc` + logic `tsc` + boundary lint + `jest` **98/98** + `expo-doctor` 18/18.
+
+**Not established:** any hosted-GoTrue behaviour, any on-device/simulator behaviour, `expo-sqlite` close/re-open semantics, the recovery deep-link end-to-end, rendered-component/a11y tests. **WORK-007 / WORK-010 / WORK-013 (+ its cross-run) / WORK-020 hosted cross-run stay open; the Foundation exit gate is not met.**
+
+### Next verification step
+
+Increment 3: place `fitney-dev` client env + redirect config (§14.6), then run the **hosted GoTrue smoke** on the designated dev environment with synthetic accounts (sign-up → confirm → sign-in → token refresh → password recovery → sign-out), the **WORK-013** sync conformance suite against the client-linked project, and the **WORK-020** reproducible client↔server recompute cross-run — then WORK-010 (Expo SQLite runtime) and WORK-007 (device test of the offline-logging flow), after which the Foundation exit gate is assessed.
