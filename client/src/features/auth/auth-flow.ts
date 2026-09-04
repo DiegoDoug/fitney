@@ -14,6 +14,7 @@ import {
   classifyAuthError,
   ENUMERATION_SENSITIVE,
   normalizeEmail,
+  validatePassword,
   validateSignInForm,
   validateSignUpForm,
   hasErrors,
@@ -112,7 +113,7 @@ export class AuthFlow {
   }
 
   async resetPassword(newPassword: string, confirm: string): Promise<AuthActionResult> {
-    if (newPassword.length < 8) return fail('weak_password');
+    if (validatePassword(newPassword) != null) return fail('weak_password');
     if (newPassword !== confirm) return fail('weak_password');
     try {
       await this.auth.updatePassword(newPassword);

@@ -52,22 +52,24 @@ describe('AuthFlow.signIn', () => {
 describe('AuthFlow.signUp', () => {
   it('reports needsEmailConfirmation + signedIn flags', async () => {
     const { flow } = make();
-    const res = await flow.signUp('new@x.co', 'password1', 'password1');
+    const res = await flow.signUp('new@x.co', 'Password1', 'Password1');
     expect(res).toEqual({ ok: true, needsEmailConfirmation: false, signedIn: true });
   });
 
   it('an existing email yields the SAME shape as a fresh confirm-required sign-up (no enumeration)', async () => {
     const { auth, flow } = make();
-    await auth.signUp('dupe@x.co', 'password1');
+    await auth.signUp('dupe@x.co', 'Password1');
     await auth.signOut();
-    const again = await flow.signUp('dupe@x.co', 'password9', 'password9');
+    const again = await flow.signUp('dupe@x.co', 'Password9', 'Password9');
     expect(again).toEqual({ ok: true, needsEmailConfirmation: true, signedIn: false });
   });
 
-  it('rejects a weak password / mismatch locally', async () => {
+  it('rejects a weak password / mismatch locally (aligned to the hosted policy)', async () => {
     const { flow } = make();
     expect(await flow.signUp('a@b.co', 'short', 'short')).toMatchObject({ ok: false, code: 'weak_password' });
-    expect(await flow.signUp('a@b.co', 'password1', 'password2')).toMatchObject({ ok: false });
+    // 8+ chars but no uppercase -> still weak (config.toml lower_upper_letters_digits)
+    expect(await flow.signUp('a@b.co', 'password1', 'password1')).toMatchObject({ ok: false, code: 'weak_password' });
+    expect(await flow.signUp('a@b.co', 'Password1', 'Password2')).toMatchObject({ ok: false });
   });
 });
 
@@ -81,11 +83,12 @@ describe('AuthFlow.sendPasswordReset', () => {
 });
 
 describe('AuthFlow.resetPassword', () => {
-  it('validates length + match, then updates', async () => {
+  it('validates the policy + match, then updates', async () => {
     const { auth, flow } = make({ initialSession: { user: { id: 'u', email: 'u@x.co' }, expiresAtMs: null } });
     expect(await flow.resetPassword('short', 'short')).toMatchObject({ ok: false, code: 'weak_password' });
-    expect(await flow.resetPassword('longenough', 'different')).toMatchObject({ ok: false });
-    expect(await flow.resetPassword('longenough', 'longenough')).toEqual({ ok: true });
+    expect(await flow.resetPassword('longenough1', 'longenough1')).toMatchObject({ ok: false, code: 'weak_password' }); // no uppercase
+    expect(await flow.resetPassword('Longenough1', 'different')).toMatchObject({ ok: false });
+    expect(await flow.resetPassword('Longenough1', 'Longenough1')).toEqual({ ok: true });
     void auth;
   });
 });

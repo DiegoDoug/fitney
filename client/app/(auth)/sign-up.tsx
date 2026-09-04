@@ -10,7 +10,7 @@ import {
 } from '@/components/ui';
 import { useTheme } from '@/design-system/theme';
 import { useAuth } from '@/runtime/context';
-import { validateSignUpForm, hasErrors, MIN_PASSWORD_LENGTH, type FieldErrors } from '@/services/auth';
+import { validateSignUpForm, hasErrors, PASSWORD_POLICY_HINT, type FieldErrors } from '@/services/auth';
 
 /**
  * Create account (SPEC AUTH-01). States: idle, validating, submitting,
@@ -83,7 +83,7 @@ export default function SignUpScreen() {
           value={password}
           onChangeText={setPassword}
           error={errs.password}
-          hint={`At least ${MIN_PASSWORD_LENGTH} characters.`}
+          hint={PASSWORD_POLICY_HINT}
           secureTextEntry
           autoCapitalize="none"
           autoComplete="new-password"

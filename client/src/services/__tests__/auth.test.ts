@@ -53,13 +53,17 @@ describe('form validators', () => {
     expect(validateEmail('nope')).toMatch(/valid/i);
     expect(validateEmail('  A@B.co ')).toBeNull();
   });
-  it('validatePassword enforces the minimum length', () => {
+  it('validatePassword mirrors the approved hosted policy (len>=8, lower, upper, digit)', () => {
     expect(validatePassword('short')).toMatch(new RegExp(`${MIN_PASSWORD_LENGTH}`));
-    expect(validatePassword('longenough')).toBeNull();
+    expect(validatePassword('alllowercase1')).toMatch(/uppercase/i);
+    expect(validatePassword('ALLUPPERCASE1')).toMatch(/lowercase/i);
+    expect(validatePassword('NoDigitsHere')).toMatch(/number/i);
+    expect(validatePassword('Longenough1')).toBeNull();
   });
-  it('validateSignUpForm flags a mismatch', () => {
-    expect(validateSignUpForm('a@b.co', 'password1', 'password2').confirm).toBeTruthy();
-    expect(validateSignUpForm('a@b.co', 'password1', 'password1')).toEqual({});
+  it('validateSignUpForm flags a mismatch and a weak password', () => {
+    expect(validateSignUpForm('a@b.co', 'Password1', 'Password2').confirm).toBeTruthy();
+    expect(validateSignUpForm('a@b.co', 'weakpass', 'weakpass').password).toBeTruthy();
+    expect(validateSignUpForm('a@b.co', 'Password1', 'Password1')).toEqual({});
   });
   it('validateSignInForm only needs a non-empty password', () => {
     expect(validateSignInForm('a@b.co', '').password).toBeTruthy();

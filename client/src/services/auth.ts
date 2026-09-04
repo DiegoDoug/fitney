@@ -178,6 +178,18 @@ export function authErrorMessage(code: AuthErrorCode): string {
 // ------------------------------------------------------------- form validation
 export const MIN_PASSWORD_LENGTH = 8;
 
+/**
+ * Client password policy — MUST mirror the APPROVED hosted GoTrue policy
+ * (`supabase/config.toml`: `minimum_password_length = 8`,
+ * `password_requirements = "lower_upper_letters_digits"`). The client is aligned
+ * **to** the hosted policy, never the reverse (SEC-REQ-AUTH-02). Keep this and
+ * `config.toml` in lockstep — a client check weaker than the server just moves
+ * the rejection to a round-trip; a client check stronger than the server locks
+ * users out of valid passwords.
+ */
+export const PASSWORD_POLICY_HINT =
+  'At least 8 characters, including an uppercase letter, a lowercase letter, and a number.';
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function normalizeEmail(raw: string): string {
@@ -194,6 +206,9 @@ export function validateEmail(raw: string): string | null {
 export function validatePassword(pw: string): string | null {
   if (pw.length === 0) return 'Enter a password.';
   if (pw.length < MIN_PASSWORD_LENGTH) return `Use at least ${MIN_PASSWORD_LENGTH} characters.`;
+  if (!/[a-z]/.test(pw)) return 'Add a lowercase letter.';
+  if (!/[A-Z]/.test(pw)) return 'Add an uppercase letter.';
+  if (!/[0-9]/.test(pw)) return 'Add a number.';
   return null;
 }
 

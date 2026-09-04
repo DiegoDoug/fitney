@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Screen, AppText, PrimaryButton, AppTextField, FormBanner } from '@/components/ui';
 import { useTheme } from '@/design-system/theme';
 import { useAuth } from '@/runtime/context';
-import { MIN_PASSWORD_LENGTH, validatePassword } from '@/services/auth';
+import { PASSWORD_POLICY_HINT, validatePassword } from '@/services/auth';
 
 /**
  * Set a new password (SPEC AUTH-01). Reached only from a PASSWORD_RECOVERY event
@@ -51,7 +51,7 @@ export default function ResetPasswordScreen() {
           value={password}
           onChangeText={setPassword}
           error={errs.password}
-          hint={`At least ${MIN_PASSWORD_LENGTH} characters.`}
+          hint={PASSWORD_POLICY_HINT}
           secureTextEntry
           autoCapitalize="none"
           autoComplete="new-password"

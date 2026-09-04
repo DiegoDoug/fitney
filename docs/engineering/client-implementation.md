@@ -454,7 +454,77 @@ Verified against the live ruleset + workflows:
    ```
    Apply via `gh api --method PUT repos/DiegoDoug/fitney/rulesets/22205300 --input <full-ruleset-body>` (the PUT replaces the whole ruleset; the body must re-send `name`, `target`, `enforcement`, `conditions`, all existing `rules`, `bypass_actors: []`).
 
-**Authorization:** a repository ruleset is a security/settings change and is `platform-release`-owned (TASK-7 canonically scoped it to `db-verify` only). **Not applied here.** Extends CE-R1.
+**Authorization:** a repository ruleset is a security/settings change and is `platform-release`-owned (TASK-7 canonically scoped it to `db-verify` only). **Not applied here.** Extends CE-R1. Human review 2026-09-04: *"I support the proposed CE-R6 required-check changes … subject to their stated verification"* — supported in principle, pending the human's own verification of GitHub state; not yet applied.
+
+**Prepared change for review (2026-09-04).**
+
+*Part 1 — `.github/workflows/client-verify.yml`* (apply on the PR branch or a follow-up; inert until Part 2):
+
+```diff
+--- a/.github/workflows/client-verify.yml
++++ b/.github/workflows/client-verify.yml
+@@
+   pull_request:
+-    paths:
+-      - "client/**"
+-      - ".github/workflows/client-verify.yml"
+   workflow_dispatch:
+```
+
+The `push:` trigger keeps its `paths:` filter unchanged (post-merge runs on `main` need not run for non-client pushes). After this, `full-app-typecheck` + `logic-tests` report on **every** PR.
+
+*Part 2 — ruleset `22205300`* (repo-settings change; run by a maintainer / `platform-release`):
+
+```bash
+gh api --method PUT repos/DiegoDoug/fitney/rulesets/22205300 \
+  --input ce-r6-ruleset-22205300.json
+```
+
+`ce-r6-ruleset-22205300.json` — the complete current ruleset body with `full-app-typecheck` + `logic-tests` added to `required_status_checks` (the PUT replaces the whole ruleset; `name` / `target` / `enforcement` / `conditions` / all existing `rules` / `bypass_actors: []` are re-sent verbatim):
+
+```json
+{
+  "name": "Protect Main",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": { "ref_name": { "exclude": [], "include": ["~DEFAULT_BRANCH"] } },
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    { "type": "creation" },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          { "context": "db-verify",          "integration_id": 15368 },
+          { "context": "full-app-typecheck", "integration_id": 15368 },
+          { "context": "logic-tests",        "integration_id": 15368 }
+        ]
+      }
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": false,
+        "required_reviewers": [],
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true,
+        "require_extra_approval_for_unattributed_changes": true,
+        "allowed_merge_methods": ["merge", "squash", "rebase"]
+      }
+    }
+  ]
+}
+```
+
+**Order matters:** apply Part 1 first (or together). Applying Part 2 alone, while `client-verify.yml` is still path-filtered, would block any non-`client/**` PR (e.g. a governance-only sync) until Part 1 lands. Verify after both: open a trivial non-client PR and confirm all three checks report and the merge box requires them.
+
+**Ready-to-apply artifact:** `ce-r6-ruleset-22205300.json` (this exact body) is staged in the session scratchpad for `--input`; it is not committed to the repo (a ruleset body is not a source artifact).
 
 ### 14.9.4 CE-R7 — RN / worklets bump (platform-release; verified outcome)
 
@@ -476,7 +546,7 @@ Verified against the live ruleset + workflows:
 | `supabase/config.toml` `[auth]` | `site_url` / `additional_redirect_urls` = `http://localhost:19006` only. **`fitney://auth/callback` (+ Expo Go `exp://` / `https://auth.expo.io/...` variants) is NOT allow-listed** — the redirect the client now builds via `Linking.createURL('/auth/callback')`. Needs adding to `additional_redirect_urls` (config-push) or the hosted dashboard (SEC-C2). |
 | `config.toml` `enable_confirmations` | `false` with a "LOCAL ONLY" comment; hosted SEC-C2 requires `true`. Hosted `fitney-dev` state to be **confirmed read-only** before the smoke (drives whether the smoke includes a mailbox step). |
 | `config.toml` `minimum_password_length` | `8` — matches the client `MIN_PASSWORD_LENGTH`. |
-| `config.toml` `password_requirements` | `"lower_upper_letters_digits"` — **stricter than the client**, which only checks length ≥ 8. A hosted sign-up with an all-lowercase 8-char password is accepted by the client and **rejected by GoTrue** (`weak_password`, mapped to a message). UX gap: the client hint says "At least 8 characters". Increment-3 fix: either relax the dev requirement or add the character-class check + hint client-side. |
+| `config.toml` `password_requirements` | `"lower_upper_letters_digits"` — was **stricter than the client** (length-only). **FIXED on this branch (human correction 2026-09-04):** `validatePassword` now enforces length ≥ 8 **and** a lowercase letter **and** an uppercase letter **and** a digit, and the sign-up / reset hints state all four. The client is aligned **to** the approved hosted policy — the hosted policy is not weakened. `PASSWORD_POLICY_HINT` in `services/auth.ts` is the single source of the copy. |
 | `enable_anonymous_sign_ins` | `false` — consistent with AUTH-04 / OQ-3 (no guest). |
 | WORK-013 client harness | **does not exist.** `src/data/sync/__tests__/{push,pull}.test.ts` cover the `FakeGateway` subset only; a suite pointing `createSupabaseGateway(getSupabase())` at `fitney-dev` with a synthetic account JWT is increment-3 work to author. |
 
@@ -499,38 +569,67 @@ Verified against the live ruleset + workflows:
 
 ### 14.10 CE-R5 — sign-out with unsynced work: PROPOSED policy (NOT approved)
 
-Assessed with `security-identity` + `evidence-based-ui-ux` against ADR-0001 (SQLite is the system of record), ADR-0003 §2/§5 + FR-SYNC-04 ("never silently drop or lose an unsynced mutation"; a `dispatched` op is *retained until terminal or explicit user discard*), ADR-0009 (per-user DB dropped on sign-out / deletion), SEC §3 (local SQLite holds **no secrets**; tokens live only in `expo-secure-store`), UX-P4 (state stated plainly, ambiently) and UX-P5 (destructive actions name the object, preview the effect, are recoverable).
+> **Revision v2 — 2026-09-04**, after human review of v1. Five corrections applied
+> (all tightening toward FR-SYNC-04): (1) **no time-based deletion of unsynced or
+> conflicted work** — ever; (2) re-authentication **reactivates** the retained DB
+> (draining its outbox is normal sync, never a deletion); (3) "Back up & sign out"
+> must verify an **empty outbox AND zero unresolved conflicts** and **freeze local
+> writes during the final check**; (4) account-deletion cleanup follows a
+> **confirmed** server deletion, not a request; (5) client password validation is
+> **aligned to** the approved hosted policy, not the reverse (applied in code —
+> §14.9.5). v1 is superseded.
 
-**Core finding.** ADR-0009's "drop on sign-out" is a shared-device privacy measure and is correct **only when everything is already synced**. When `sync_outbox` is non-empty or `sync_conflicts` has unresolved rows, an unconditional drop permanently loses un-backed-up performed data (the source of truth for history) — a direct FR-SYNC-04 violation. The current implementation's floor (clean → drop; unsynced → retain + non-blocking notice) never discards, but it (a) offers no user choice or preview on a user-initiated dirty sign-out, (b) does not distinguish a user-initiated sign-out from an involuntary session end, and (c) has no bound on how long retained data lives.
+Assessed with `security-identity` + `evidence-based-ui-ux` against ADR-0001 (SQLite is the system of record), ADR-0003 §2/§5 + FR-SYNC-04 ("never silently drop or lose an unsynced mutation"; a `dispatched` op is *retained until a terminal protocol result or explicit user discard*), ADR-0009 (per-user DB dropped on sign-out / deletion), SEC §3 (local SQLite holds **no secrets**; tokens live only in `expo-secure-store`), UX-P4 (state stated plainly, ambiently) and UX-P5 (destructive actions name the object, preview the effect, are recoverable).
 
-**Proposed policy.**
+**Core finding.** ADR-0009's "drop on sign-out" is a shared-device privacy measure and is correct **only when everything is already synced**. When `sync_outbox` is non-empty or `sync_conflicts` has unresolved rows, an unconditional drop permanently loses un-backed-up performed data (the source of truth for history) — a direct FR-SYNC-04 violation. The shipped floor (clean → drop; unsynced → retain + non-blocking notice) never discards, but it (a) offers no user choice or preview on a user-initiated dirty sign-out, (b) does not distinguish a user-initiated sign-out from an involuntary session end (`decideSignOutDisposition` takes only `OutstandingWork`, not the cause — so an involuntary *clean* expiry currently drops the DB), and (c) leaves the retained-file lifecycle unspecified.
+
+**Proposed policy (v2).** "Outstanding work" ≡ `sync_outbox` has any `pending` **or** `dispatched` row, **or** `sync_conflicts` has an unresolved row.
 
 | Case | Behaviour |
 |---|---|
-| **Account deletion** (`delete-account` completes) | Drop the per-user DB file unconditionally + clear secure storage. Server-side hard cascade already removes the graph (SEC-DEC-04). No prompt beyond the existing delete-account re-auth + confirm + receipt. |
-| **User-initiated sign-out, nothing outstanding** (`outbox == 0` && no unresolved conflicts) | Drop the file, clear secure storage. No prompt. (ADR-0009 unchanged for this case.) |
-| **User-initiated sign-out, unsynced work present** | Sign-out becomes a **destructive action** (UX-P5). A blocking sheet names the account and the count ("N changes saved on this device aren't backed up yet") and offers: **Back up & sign out** (default when online — run a final sync; on success → drop; on failure → stay on the sheet with the options below), **Keep on this device & sign out** (retain the file; drop nothing), **Discard N changes & sign out** (second explicit confirm, then drop), **Cancel** (stay signed in). Never a dead end. |
-| **Offline / failed final sync** | "Back up & sign out" is disabled/relabelled ("You're offline — can't back up now"). "Keep on this device" and "Discard…" remain. |
-| **Involuntary session end** — token/refresh failure (`session_expired`) or displacement by another account signing in | **Always retain** the file (regardless of outbox state) + clear that user's secure storage. **No blocking prompt** (may be backgrounded; the other account is waiting). A non-blocking notice names the affected account ("Your session for <account> ended — unsynced changes are safe on this device"). On next sign-in as that user the outbox drains and the notice clears. |
-| **Retention & eventual deletion of a retained file** | Reclaimed (file dropped) when: (a) that user re-authenticates on the device and the outbox drains — it becomes their normal DB; (b) the user runs **Settings → Remove account from this device** (explicit; warns that undrained changes are lost; requires confirm); or (c) the file has had **no successful authentication for a retention window — proposed default 30 days** (abandonment; undrained changes lost). A launch-time GC enumerates `fitney-*.db`, and for files whose `userId` ≠ the current session and whose last-auth age exceeds the window, drops them. |
-| **Protection of retained data** | Same at-rest posture as an active per-user DB: OS file permissions + platform disk encryption (iOS Data Protection / Android FBE); **no secrets** are stored in SQLite (SEC §3). A retained file is only openable through the app by re-authenticating as its `userId`. Any future at-rest-encryption requirement from **SEC-OQ-1** applies equally to active and retained files — folded into SEC-OQ-1's scope, not decided here. |
+| **Account deletion** | The client drops the per-user DB file + clears secure storage **only after** the `delete-account` Edge Function returns a **success response confirming the server-side cascade completed** (the completion receipt — SEC-DEC-04). On a lost / ambiguous / failed response: **retain** local data, surface "we couldn't confirm your account was deleted", and retry the verification (delete is idempotent server-side); never drop on a mere deletion *request* or a timeout. |
+| **User-initiated sign-out, no outstanding work** | Drop the file, clear secure storage. No prompt. (ADR-0009 unchanged for this case.) |
+| **User-initiated sign-out, outstanding work present** | Sign-out is a **destructive action** (UX-P5): a blocking sheet names the account and the count and offers **Back up & sign out** / **Keep on this device & sign out** / **Discard N changes & sign out** / **Cancel**. Never a dead end. |
+| — **"Back up & sign out"** | (i) **Freeze local writes** — put the runtime into a read-only state and pause the sync scheduler's local-change trigger so nothing new can be enqueued during the check; (ii) run a final `push` + `pull` + reconcile; (iii) **re-assert `outbox == 0` AND no unresolved `sync_conflicts`**; (iv) only if (iii) holds → drop the file + clear secure storage. If (iii) does not hold (a conflict was parked, a push transport-failed, a `dispatched` op is still outstanding) → **do not drop**; return to the Keep / Discard / Cancel choice with the residual count shown. Un-freeze on Cancel. Disabled/relabelled offline ("You're offline — can't back up now"). |
+| — **"Keep on this device & sign out"** | Retain the file; drop nothing; clear secure storage. |
+| — **"Discard N changes & sign out"** | Second explicit confirm naming N and stating it is irreversible → then drop the file. This is the **only** path (besides *Remove account from this device*) that discards unsynced work, and it is explicit and informed. |
+| **Involuntary session end** — refresh failure (`session_expired`) or displacement by another account signing in | **Always retain** the file (regardless of outbox state) + clear that user's secure storage. **No blocking prompt** (may be backgrounded; the other account is waiting). A non-blocking notice names the affected account. |
+| **Re-authentication as a retained account's `userId`** | The retained file is simply **re-opened as that user's active per-user DB**. Its outbox drains through normal sync (ADR-0003); the file is **never dropped as a side effect of draining**. It is dropped only later by a subsequent *user-initiated sign-out with no outstanding work*, a *confirmed account deletion*, or an explicit *Remove account from this device*. |
+| **Retention of a retained file** | A retained file **with outstanding work is retained indefinitely** — there is **no time-based or automatic deletion** of unsynced mutations or unresolved conflicts (FR-SYNC-04). It leaves the device only by reconciliation (re-auth + drain) or explicit informed discard (the *Discard* option above, or *Remove account from this device*). A retained file that is **fully drained** (zero outbox, zero open conflicts — e.g. an involuntary clean expiry) holds nothing that can be lost; whether such a file is also reclaimed after an inactivity window, and the window length, is **deferred to SEC-OQ-1** (not decided here). Any launch-time GC MUST skip a file with outstanding work. |
+| **Remove account from this device** (new Settings action) | Explicit; the confirm names N outstanding changes and states they will be permanently lost; on confirm → drop the file + clear that user's secure storage. |
+| **Protection of retained data** | Same at-rest posture as an active per-user DB: OS file permissions + platform disk encryption (iOS Data Protection / Android FBE); **no secrets** are in SQLite (SEC §3). A retained file is only openable through the app by re-authenticating as its `userId`. Any future at-rest-encryption requirement from **SEC-OQ-1** applies equally to active and retained files. |
 
-**Exact user-facing choices** (dirty user-initiated sign-out sheet — copy is proposed, `evidence-based-ui-ux` to finalise):
+**Exact user-facing choices** (dirty user-initiated sign-out sheet — copy proposed, `evidence-based-ui-ux` to finalise):
 
-- Title: **"Sign out of <account>?"**
+- Title: **"Sign out of ‹account›?"**
 - Body: **"N changes are saved on this device but not backed up yet."**
-- **Back up & sign out** (primary; disabled offline with the reason shown)
+- **Back up & sign out** (primary; disabled offline with the reason shown; only completes if the post-sync re-check finds nothing outstanding)
 - **Keep on this device & sign out** (secondary)
-- **Discard N changes & sign out** (destructive; opens a second confirm: *"Permanently delete N unsynced changes from this device? This can't be undone."*)
+- **Discard N changes & sign out** (destructive; second confirm: *"Permanently delete N unsynced changes from this device? This can't be undone."*)
 - **Cancel**
 
-**Proposed ADR-0009 wording** — replace the third bullet ("The **local SQLite database is per-user** … that user's local DB file is dropped."):
+**Proposed ADR-0009 wording (v2)** — replace the third bullet ("The **local SQLite database is per-user** … that user's local DB file is dropped."):
 
 > - The **local SQLite database is per-user** (DB file keyed by `userId`).
-> - On **account deletion**, that user's DB file is dropped unconditionally, with secure storage cleared.
-> - On **user-initiated sign-out with nothing outstanding** (`sync_outbox` empty, no unresolved `sync_conflicts`), the file is dropped and secure storage cleared.
-> - On **user-initiated sign-out with outstanding local work**, the file is **retained** and sign-out is presented as a destructive action (UX-P5): *back up & sign out* (final sync, then drop), *keep on this device & sign out* (retain), or *discard N changes & sign out* (explicit confirm, then drop). Sign-out **never** silently discards a `pending` or `dispatched` mutation (FR-SYNC-04).
+> - On **account deletion**, the client drops that user's DB file and clears secure storage **only after the `delete-account` flow returns a response confirming the server-side cascade completed**; on an unconfirmed/failed response the local data is retained and deletion is re-verified (never dropped on a request alone).
+> - On **user-initiated sign-out with no outstanding local work** (`sync_outbox` empty, no unresolved `sync_conflicts`), the file is dropped and secure storage cleared.
+> - On **user-initiated sign-out with outstanding local work**, the file is **retained** and sign-out is a destructive action (UX-P5): *back up & sign out* (freeze local writes, run a final sync, then drop **only if** the outbox is empty and no conflict is unresolved — otherwise fall back to the choices below), *keep on this device & sign out* (retain), or *discard N changes & sign out* (explicit informed confirm, then drop). Sign-out **never** silently discards a `pending` or `dispatched` mutation, and there is **no time-based deletion** of unsynced work (FR-SYNC-04).
 > - On an **involuntary session end** (refresh failure → `session_expired`, or displacement by another account), the file is **retained** with no prompt and a non-blocking notice naming the account; secure storage for that user is cleared.
-> - A retained file is reclaimed by (a) that user re-authenticating and draining the outbox, (b) an explicit *Settings → Remove account from this device*, or (c) a retention window with no successful authentication (**proposed 30 days**, pending SEC-OQ-1); (b) and (c) may lose undrained changes and say so. Retained data carries the same at-rest posture as an active per-user DB (no secrets in SQLite; tokens in `expo-secure-store` only).
+> - **Re-authentication** as a retained account reactivates its file as the active per-user DB; draining its outbox is normal synchronization and never deletes the file. A retained file leaves the device only by an explicit *Remove account from this device* or a subsequent clean sign-out / confirmed deletion. Retained data carries the same at-rest posture as an active per-user DB (no secrets in SQLite; tokens in `expo-secure-store` only).
 
-**Status: PROPOSED — do not ratify the current implementation and do not treat this as an accepted ADR delta until the human approves.** Implementation delta once approved (increment 3+): pass the sign-out *cause* into `decideSignOutDisposition`; add the dirty-sign-out choice sheet + copy; add *Remove account from this device*; add the launch-time retained-file GC with the retention window; fold the retained-local-data question into **SEC-OQ-1**. Preserves and does not close SEC-OQ-1, SEC-RESID-1, OQ-3, OQ-9/DEP-4, UX-OQ-4, ISS-28, CE-R1, CE-R2.
+**Status: PROPOSED (v2) — do not ratify the current implementation and do not treat this as an accepted ADR delta until the human approves.** Implementation delta once approved (increment 3+): pass the sign-out *cause* into `decideSignOutDisposition`; add a "freeze local writes" state to the runtime + a post-sync re-check for *Back up & sign out*; add the dirty-sign-out choice sheet + copy; add *Settings → Remove account from this device*; make account-deletion cleanup gate on the confirmed `delete-account` receipt; a launch-time GC (if any) reclaims **only** fully-drained non-current files, with the window deferred to **SEC-OQ-1**. Preserves and does not close SEC-OQ-1, SEC-RESID-1, OQ-3, OQ-9/DEP-4, UX-OQ-4, ISS-28, CE-R1, CE-R2.
+
+### 14.11 Human review response — 2026-09-04
+
+Human review of §14.9–14.10 (no policy or phase approved). Outcomes:
+
+| Item | Human position | This pass |
+|---|---|---|
+| **CE-R5 v1** | Revise before approval; the 30-day deletion is the main gap. Five required corrections. | **§14.10 revised to v2** — all five applied: (1) no time-based deletion of unsynced/conflicted work, ever — retained until reconciliation or explicit informed discard; (2) re-auth *reactivates* the retained DB, draining ≠ deletion; (3) *Back up & sign out* verifies empty outbox **and** zero unresolved conflicts and **freezes local writes** during the final check; (4) account-deletion cleanup gates on a **confirmed** server deletion, not a request; (5) client password validation **aligned to** the approved hosted policy (code, below). Still **PROPOSED** — not ratified; Foundation acceptance stays open. |
+| **CE-R6** | Supported "subject to their stated verification"; CI success is *reported* evidence, not independently checked by the human. | Prepared change staged for review (§14.9.3) — `client-verify.yml` path-filter diff + full ruleset PUT body (`ce-r6-ruleset-22205300.json`). **Not applied** (repo-settings / `platform-release`). |
+| **CE-R7** | Ratification supported "subject to their stated verification". | Verified outcome recorded (§14.9.4). On-device confirmation of RN `0.81.5` + worklets remains in WORK-010 / increment 3. **Not independently applied** beyond the `expo install` result already in the PR. |
+| **Password policy (correction 5)** | Align the client to the approved hosted policy; do not weaken the hosted policy to make tests pass. | **Applied on the branch.** `services/auth.ts` `validatePassword` now enforces length ≥ 8 **and** lowercase **and** uppercase **and** digit — mirroring `supabase/config.toml` `minimum_password_length = 8` + `password_requirements = "lower_upper_letters_digits"`. `PASSWORD_POLICY_HINT` is the single source of the sign-up / reset copy. `AuthFlow.resetPassword` now calls `validatePassword` (was a bare length check). Tests updated to compliant fixtures (no policy weakened). Gates re-run: full-app `tsc` PASS, logic `tsc` PASS, `depcruise` 0 err, `jest` 98/98. `config.toml` is unchanged. |
+
+**Not changed:** no ADR file, no ruleset, no approved-decision record. Phase 5 stays **IN PROGRESS**; the Foundation exit gate stays **open**. All issue IDs preserved (SEC-OQ-1, SEC-RESID-1, OQ-3, OQ-9/DEP-4, UX-OQ-4, ISS-28, CE-R1, CE-R2).
+
+**Files changed this pass:** `client/src/services/auth.ts`, `client/src/features/auth/auth-flow.ts`, `client/app/(auth)/sign-up.tsx`, `client/app/(auth)/reset-password.tsx`, `client/src/services/__tests__/auth.test.ts`, `client/src/features/auth/__tests__/auth-flow.test.ts`, this artifact (§14.9.3, §14.9.5, §14.10, §14.11).
