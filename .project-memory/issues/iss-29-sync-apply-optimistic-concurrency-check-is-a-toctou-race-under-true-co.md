@@ -5,8 +5,8 @@ title: "sync_apply optimistic-concurrency check is a TOCTOU race under true conc
 notion_page_id: "3d1e6070-43bc-819d-b47f-c3070a84cd5b"
 notion_url: "https://app.notion.com/p/sync_apply-optimistic-concurrency-check-is-a-TOCTOU-race-under-true-concurrent-writers-can-silent-3d1e607043bc819db47fc3070a84cd5b"
 created: "2026-09-04T16:22:00.000Z"
-last_edited: "2026-09-04T16:22:00.000Z"
-status: "Open"
+last_edited: "2026-09-04T20:46:00.000Z"
+status: "Resolved"
 ---
 
 # sync_apply optimistic-concurrency check is a TOCTOU race under true concurrent writers -- can silently drop a conflicting edit
@@ -29,7 +29,7 @@ docs/engineering/evidence/12-work013-hosted-scenarios.json (full reproduction: r
 
 ## Proposed Resolution
 
-supabase/migrations/20260902090006_security_hardening.sql sync_apply()'s UPDATE branch reads v_current via a plain (non-locking) SELECT, then later runs update %I t set ... where t.id = $2 -- the UPDATE's WHERE clause checks id only, never re-verifying version, so a second concurrent transaction that read the same stale v_current before either committed will still successfully overwrite. Recommended fix (NOT applied -- backend-data-engineering/security-identity own this function): make the version check part of the UPDATE's WHERE clause itself (where t.id = $2 and t.version = $3, bind base_version), treat 0 rows affected as a conflict (re-select current row+version) rather than trusting the earlier SELECT; or add for update to the initial SELECT so the second transaction blocks on the row lock and correctly re-reads the post-commit version before deciding.
+RESOLVED 2026-09-04 (DEC-55). Migration supabase/migrations/20260904200000_sync_apply_atomic_concurrency_fix.sql makes the version check + write one atomic compare-and-swap (UPDATE ... WHERE id=$2 AND version=$3), with a processed_operations recheck on a zero-rows-affected result so a concurrent operation_id replay reports 'duplicate' (never a spurious 'conflict'); the same recheck fixed a second real gap in the INSERT path's unique_violation handler (previously misreported a replay as 'rejected'). Verified: red-run against the reverted old function reproducibly FAILED (4/5, 0/3, 0/3, 0/3 across 4 scenarios); green-run against the fix passed 5/5 across 3 clean local runs plus 4 clean hosted runs against fitney-dev. CI-gated in db-verify.yml (client/src/data/sync/tests/hosted/sync-apply-concurrency.hosted.test.ts). Applied to fitney-dev only (no db reset, no unrelated auth change); security advisor unchanged; WORK-020 hosted evidence re-confirmed unchanged. Full record: docs/engineering/evidence/13-iss29-fix-regression.md, docs/engineering/client-implementation.md SS14.20.
 
 ## GitHub Ref
 

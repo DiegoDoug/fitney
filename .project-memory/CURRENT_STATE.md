@@ -2,7 +2,7 @@
 notion_page_id: "3cfe6070-43bc-8046-b281-eb56b92335af"
 notion_url: "https://app.notion.com/p/Fitney-3cfe607043bc8046b281eb56b92335af"
 last_edited: "2026-09-03T15:00:00.000Z"
-generated_at: "2026-09-04T16:34:53.942Z"
+generated_at: "2026-09-04T20:46:53.549Z"
 ---
 
 # Current State
@@ -13,7 +13,6 @@ Phase 5 Client Engineering is UNLOCKED but NOT STARTED after human approval of t
 
 ## Unresolved Issues
 
-- sync_apply optimistic-concurrency check is a TOCTOU race under true concurrent writers -- can silently drop a conflicting edit — Open
 - ISS-28: hosted + local + CI are Postgres 17, not the Postgres 15 assumed by BD-DEC-01 — Decision Needed
 - AR-OQ-1–4: Architecture open questions (UUIDv7, Zod vs valibot, recompute form, reactive query layer) — Open
 - BD-OQ-3–4: Backend optimisation / retention questions (sync_apply batching; processed_operations pruning) — Open
@@ -44,6 +43,7 @@ Phase 5 Client Engineering is UNLOCKED but NOT STARTED after human approval of t
 
 ## Reviews Requiring Attention
 
+- Fitney user workflow atlas and render coverage — draft for review — In Review
 - Phase 5 — Client engineering: increment 2 (auth → per-user SQLite isolation → onboarding) — ready for review — In Review
 - Phase 5 — Client engineering: increment 1 (Foundation + logic layers) — in review, revisions requested — In Review
 - Phase 8 — Platform & Release human approval (dev-only gate) — Pass with Conditions
