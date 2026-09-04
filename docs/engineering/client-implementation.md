@@ -400,3 +400,137 @@ Delivered + verified where verifiable here: the auth seam + GoTrue gateway behin
 ### Next verification step
 
 Increment 3: place `fitney-dev` client env + redirect config (§14.6), then run the **hosted GoTrue smoke** on the designated dev environment with synthetic accounts (sign-up → confirm → sign-in → token refresh → password recovery → sign-out), the **WORK-013** sync conformance suite against the client-linked project, and the **WORK-020** reproducible client↔server recompute cross-run — then WORK-010 (Expo SQLite runtime) and WORK-007 (device test of the offline-logging flow), after which the Foundation exit gate is assessed.
+
+---
+
+## 14.9 Bounded pre-merge review (2026-09-04)
+
+Read-only + reversible-prep review of PR #2. **No merge. Phase 5 stays IN PROGRESS; phases 9/10/11 LOCKED.** No ADR, ruleset, or approved-decision record was changed — §14.10 below is a **PROPOSED** policy awaiting owner approval.
+
+### 14.9.1 PR head & checks (verified)
+
+| | |
+|---|---|
+| PR | [#2](https://github.com/DiegoDoug/fitney/pull/2), state OPEN, `mergeStateStatus: CLEAN` |
+| Head commit | `6cb08091e2f020b200642be5bf362912ee5e06ec` (local `phase-5/auth-isolation` == this; 0 commits behind `origin/main`; working tree clean) |
+| `db-verify` (required) | ✅ SUCCESS (01:56:49→01:59:26Z) |
+| `full-app-typecheck` | ✅ SUCCESS (01:56:49→01:58:50Z) |
+| `logic-tests` | ✅ SUCCESS (01:56:50→01:57:23Z) |
+
+### 14.9.2 Concrete merge blockers
+
+1. **Governance gate** — this is *not* a Phase 5 submission; only the human advances the lifecycle. PR #2 must not be merged as a phase approval.
+2. **CE-R5 unresolved** — the sign-out disposition is INTERIM. §14.10 is a **proposal**; it needs `security-identity` + `evidence-based-ui-ux` sign-off before the behaviour is settled. Merging the code is possible before that (the code never discards), but the review record must not read as ratified.
+3. **CE-R6 not applied** — `full-app-typecheck` + `logic-tests` are still advisory (see 14.9.3). Requires a ruleset change the human/`platform-release` must authorize.
+4. **Foundation exit gate open** — WORK-007 / WORK-010 / WORK-013 (+ its cross-run) / WORK-020 hosted cross-run. Not a blocker for merging *this increment* (it is explicitly not a phase submission), but blocks Phase 5 approval.
+
+Nothing in the diff itself blocks a technical merge: CI is green, boundary lint clean, no ADR/schema/`supabase/` change, deps are `expo install`-sourced and SDK-54-compatible.
+
+### 14.9.3 CE-R6 — required checks (platform-release; verified, NOT applied)
+
+Verified against the live ruleset + workflows:
+
+- Ruleset **"Protect Main"** (id `22205300`, `enforcement: active`, `bypass_actors: []`, `current_user_can_bypass: never`, `strict_required_status_checks_policy: true`) lists **one** required check: `db-verify` (`integration_id: 15368` = GitHub Actions).
+- Check names are the CI **job** names: `db-verify` (`db-verify.yml`), `full-app-typecheck` + `logic-tests` (`client-verify.yml`).
+- **Trigger coupling (the gotcha):** `client-verify.yml`'s `pull_request:` trigger is **path-filtered** to `client/**` + its own file. `db-verify.yml`'s `pull_request:` trigger has **no** path filter (widened by CE-DEC-08 for exactly this reason). GitHub does **not** auto-pass a required check whose workflow never ran — it stays "Expected / waiting" and **blocks merge**. So a PR that touches only non-`client/**` files (e.g. a governance-only `.project-memory/**` + roadmap PR) would deadlock the moment `full-app-typecheck` / `logic-tests` become required.
+
+**Minimal change — two coupled parts, present for approval:**
+
+1. `.github/workflows/client-verify.yml` — drop the `paths:` filter on the `pull_request:` trigger (keep the `push: [main]` filter). Non-weakening: same jobs, run on every PR, matching `db-verify.yml`.
+   ```diff
+      pull_request:
+   -    paths:
+   -      - "client/**"
+   -      - ".github/workflows/client-verify.yml"
+      workflow_dispatch:
+   ```
+2. Ruleset `22205300` — add two contexts to `required_status_checks`:
+   ```
+   required_status_checks: [
+     { context: "db-verify",          integration_id: 15368 },
+     { context: "full-app-typecheck", integration_id: 15368 },   # add
+     { context: "logic-tests",        integration_id: 15368 },   # add
+   ]
+   ```
+   Apply via `gh api --method PUT repos/DiegoDoug/fitney/rulesets/22205300 --input <full-ruleset-body>` (the PUT replaces the whole ruleset; the body must re-send `name`, `target`, `enforcement`, `conditions`, all existing `rules`, `bypass_actors: []`).
+
+**Authorization:** a repository ruleset is a security/settings change and is `platform-release`-owned (TASK-7 canonically scoped it to `db-verify` only). **Not applied here.** Extends CE-R1.
+
+### 14.9.4 CE-R7 — RN / worklets bump (platform-release; verified outcome)
+
+`react-native` `0.81.4 → 0.81.5`, `+ react-native-worklets@0.5.1`; `@supabase/supabase-js` unchanged (`2.112.4`, only alphabetised). Assessment:
+
+- **SDK-54-compatible, `expo install`-sourced.** `0.81.5` is SDK 54's `bundledNativeModules` pin; `react-native-worklets@0.5.1` is what `expo install react-native-worklets` resolves for SDK 54 + `react-native-reanimated@4.1.7`. **Not** an SDK upgrade; `legacy-peer-deps` was not used as compatibility evidence (`expo install --check` → up to date; `expo-doctor` → 18/18).
+- **Corrects a real latent gap:** Reanimated 4 requires `react-native-worklets` as a **separate direct peer dependency** (split out in v4); it was missing on `main` since increment 1 — inert inside Expo Go (worklets bundled) but a crash risk in a dev-build / production.
+- **CI-green** on the bumped lockfile (`full-app-typecheck` + `logic-tests`).
+- **Not established:** on-device runtime behaviour of `0.81.5` / worklets (Reanimated worklet execution, gesture transitions) — folds into WORK-010 / the increment-3 device pass.
+
+**Recommended outcome:** ratify the lockfile change at the pinned-dependency review; record that `react-native-worklets` is now a **direct dependency that must be re-pinned via `expo install` alongside Reanimated on every future SDK bump**. `npm audit` reports 25 transitive dev-toolchain advisories (1 critical / 11 high) — pre-existing, `npm audit fix --force` would break the RN toolchain; leave for `platform-release` + `quality-engineering`.
+
+### 14.9.5 Increment-3 environment inspection (read-only; no credentials exposed)
+
+| Item | State |
+|---|---|
+| `client/.env` | **absent** (only `client/.env.example`). `data/remote/client.ts` needs `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY` (via `app.json` `extra` or `process.env`). |
+| Supabase CLI link | `supabase/.temp/project-ref` present (git-ignored) — the CLI is linked to the dev project (`fitney-dev`, ref recorded in the roadmap / DEP-1). |
+| `supabase/config.toml` `[auth]` | `site_url` / `additional_redirect_urls` = `http://localhost:19006` only. **`fitney://auth/callback` (+ Expo Go `exp://` / `https://auth.expo.io/...` variants) is NOT allow-listed** — the redirect the client now builds via `Linking.createURL('/auth/callback')`. Needs adding to `additional_redirect_urls` (config-push) or the hosted dashboard (SEC-C2). |
+| `config.toml` `enable_confirmations` | `false` with a "LOCAL ONLY" comment; hosted SEC-C2 requires `true`. Hosted `fitney-dev` state to be **confirmed read-only** before the smoke (drives whether the smoke includes a mailbox step). |
+| `config.toml` `minimum_password_length` | `8` — matches the client `MIN_PASSWORD_LENGTH`. |
+| `config.toml` `password_requirements` | `"lower_upper_letters_digits"` — **stricter than the client**, which only checks length ≥ 8. A hosted sign-up with an all-lowercase 8-char password is accepted by the client and **rejected by GoTrue** (`weak_password`, mapped to a message). UX gap: the client hint says "At least 8 characters". Increment-3 fix: either relax the dev requirement or add the character-class check + hint client-side. |
+| `enable_anonymous_sign_ins` | `false` — consistent with AUTH-04 / OQ-3 (no guest). |
+| WORK-013 client harness | **does not exist.** `src/data/sync/__tests__/{push,pull}.test.ts` cover the `FakeGateway` subset only; a suite pointing `createSupabaseGateway(getSupabase())` at `fitney-dev` with a synthetic account JWT is increment-3 work to author. |
+
+**Missing access / config / hardware for increment 3:**
+
+1. `client/.env` populated with the `fitney-dev` **client-safe** URL + anon key (never a service-role key).
+2. `fitney://auth/callback` + Expo Go redirect variants allow-listed in `fitney-dev` Auth settings.
+3. Read-only confirmation of `fitney-dev` GoTrue state: `enable_confirmations`, leaked-password protection, user-enumeration protection, rate limits (SEC-REQ-AUTH-02/03).
+4. 2–3 **synthetic** throwaway test accounts scoped to `fitney-dev` (never real credentials, never production).
+5. `SUPABASE_ACCESS_TOKEN` for any CLI `--linked` step (WORK-013 / WORK-020 cross-run) — a human step; keep to `fitney-dev`.
+6. **Hardware**: an iOS Simulator + Android emulator (or physical devices) + a Metro dev server for WORK-007 / WORK-010 (Expo runtime, `expo-sqlite` close/re-open, secure-store chunking, deep-link timing, RN 0.81.5 + worklets). Not available in this environment.
+
+**Prepared verification commands (run in increment 3, isolated to `fitney-dev` + synthetic accounts):**
+
+- Hosted GoTrue smoke — `cd client && EXPO_PUBLIC_SUPABASE_URL=… EXPO_PUBLIC_SUPABASE_ANON_KEY=… npx expo start` on a simulator; drive sign-up → (confirm) → sign-in → force `TOKEN_REFRESHED` (short `jwt_expiry` or `sb.auth.refreshSession`) → `resetPasswordForEmail` → open the recovery deep link → `updatePassword` → sign-out; assert the `AuthChange` sequence + secure-store round-trip. New harness: `src/data/remote/__tests__/auth-gateway.hosted.test.ts` (guarded by env, excluded from `jest.config.cjs`).
+- Sync conformance (WORK-013) — new `src/data/sync/__tests__/conformance.hosted.test.ts` against the real gateway + a synthetic JWT: concurrent writers, forced skew, kill-mid-push replay, same-timestamp page boundary, in-flight-successor ack, late-commit reconciliation, lost-response-with-successor, parked completed-session conflict.
+- WORK-020 cross-run — seed a fixture session on `fitney-dev`, let the server triggers materialise derived rows, pull, and assert client `domain/{calc,pr,week,uuid5}` output == the actual materialised `personal_records` / `weekly_aggregates` / `exercise_weekly_rollups` IDs + values (DEC-52).
+- WORK-010 — on-device: `expo-sqlite` `BEGIN IMMEDIATE` / WAL / prepared-statement behaviour, `deleteDatabaseAsync` after `closeAsync`, per-user file re-open on relaunch.
+- WORK-007 — device test of the offline-logging flow end to end (no confirmed-set loss on force-close/relaunch) + auth/onboarding screens (Dynamic Type, VoiceOver/TalkBack order, RTL, keyboard-avoidance).
+
+### 14.10 CE-R5 — sign-out with unsynced work: PROPOSED policy (NOT approved)
+
+Assessed with `security-identity` + `evidence-based-ui-ux` against ADR-0001 (SQLite is the system of record), ADR-0003 §2/§5 + FR-SYNC-04 ("never silently drop or lose an unsynced mutation"; a `dispatched` op is *retained until terminal or explicit user discard*), ADR-0009 (per-user DB dropped on sign-out / deletion), SEC §3 (local SQLite holds **no secrets**; tokens live only in `expo-secure-store`), UX-P4 (state stated plainly, ambiently) and UX-P5 (destructive actions name the object, preview the effect, are recoverable).
+
+**Core finding.** ADR-0009's "drop on sign-out" is a shared-device privacy measure and is correct **only when everything is already synced**. When `sync_outbox` is non-empty or `sync_conflicts` has unresolved rows, an unconditional drop permanently loses un-backed-up performed data (the source of truth for history) — a direct FR-SYNC-04 violation. The current implementation's floor (clean → drop; unsynced → retain + non-blocking notice) never discards, but it (a) offers no user choice or preview on a user-initiated dirty sign-out, (b) does not distinguish a user-initiated sign-out from an involuntary session end, and (c) has no bound on how long retained data lives.
+
+**Proposed policy.**
+
+| Case | Behaviour |
+|---|---|
+| **Account deletion** (`delete-account` completes) | Drop the per-user DB file unconditionally + clear secure storage. Server-side hard cascade already removes the graph (SEC-DEC-04). No prompt beyond the existing delete-account re-auth + confirm + receipt. |
+| **User-initiated sign-out, nothing outstanding** (`outbox == 0` && no unresolved conflicts) | Drop the file, clear secure storage. No prompt. (ADR-0009 unchanged for this case.) |
+| **User-initiated sign-out, unsynced work present** | Sign-out becomes a **destructive action** (UX-P5). A blocking sheet names the account and the count ("N changes saved on this device aren't backed up yet") and offers: **Back up & sign out** (default when online — run a final sync; on success → drop; on failure → stay on the sheet with the options below), **Keep on this device & sign out** (retain the file; drop nothing), **Discard N changes & sign out** (second explicit confirm, then drop), **Cancel** (stay signed in). Never a dead end. |
+| **Offline / failed final sync** | "Back up & sign out" is disabled/relabelled ("You're offline — can't back up now"). "Keep on this device" and "Discard…" remain. |
+| **Involuntary session end** — token/refresh failure (`session_expired`) or displacement by another account signing in | **Always retain** the file (regardless of outbox state) + clear that user's secure storage. **No blocking prompt** (may be backgrounded; the other account is waiting). A non-blocking notice names the affected account ("Your session for <account> ended — unsynced changes are safe on this device"). On next sign-in as that user the outbox drains and the notice clears. |
+| **Retention & eventual deletion of a retained file** | Reclaimed (file dropped) when: (a) that user re-authenticates on the device and the outbox drains — it becomes their normal DB; (b) the user runs **Settings → Remove account from this device** (explicit; warns that undrained changes are lost; requires confirm); or (c) the file has had **no successful authentication for a retention window — proposed default 30 days** (abandonment; undrained changes lost). A launch-time GC enumerates `fitney-*.db`, and for files whose `userId` ≠ the current session and whose last-auth age exceeds the window, drops them. |
+| **Protection of retained data** | Same at-rest posture as an active per-user DB: OS file permissions + platform disk encryption (iOS Data Protection / Android FBE); **no secrets** are stored in SQLite (SEC §3). A retained file is only openable through the app by re-authenticating as its `userId`. Any future at-rest-encryption requirement from **SEC-OQ-1** applies equally to active and retained files — folded into SEC-OQ-1's scope, not decided here. |
+
+**Exact user-facing choices** (dirty user-initiated sign-out sheet — copy is proposed, `evidence-based-ui-ux` to finalise):
+
+- Title: **"Sign out of <account>?"**
+- Body: **"N changes are saved on this device but not backed up yet."**
+- **Back up & sign out** (primary; disabled offline with the reason shown)
+- **Keep on this device & sign out** (secondary)
+- **Discard N changes & sign out** (destructive; opens a second confirm: *"Permanently delete N unsynced changes from this device? This can't be undone."*)
+- **Cancel**
+
+**Proposed ADR-0009 wording** — replace the third bullet ("The **local SQLite database is per-user** … that user's local DB file is dropped."):
+
+> - The **local SQLite database is per-user** (DB file keyed by `userId`).
+> - On **account deletion**, that user's DB file is dropped unconditionally, with secure storage cleared.
+> - On **user-initiated sign-out with nothing outstanding** (`sync_outbox` empty, no unresolved `sync_conflicts`), the file is dropped and secure storage cleared.
+> - On **user-initiated sign-out with outstanding local work**, the file is **retained** and sign-out is presented as a destructive action (UX-P5): *back up & sign out* (final sync, then drop), *keep on this device & sign out* (retain), or *discard N changes & sign out* (explicit confirm, then drop). Sign-out **never** silently discards a `pending` or `dispatched` mutation (FR-SYNC-04).
+> - On an **involuntary session end** (refresh failure → `session_expired`, or displacement by another account), the file is **retained** with no prompt and a non-blocking notice naming the account; secure storage for that user is cleared.
+> - A retained file is reclaimed by (a) that user re-authenticating and draining the outbox, (b) an explicit *Settings → Remove account from this device*, or (c) a retention window with no successful authentication (**proposed 30 days**, pending SEC-OQ-1); (b) and (c) may lose undrained changes and say so. Retained data carries the same at-rest posture as an active per-user DB (no secrets in SQLite; tokens in `expo-secure-store` only).
+
+**Status: PROPOSED — do not ratify the current implementation and do not treat this as an accepted ADR delta until the human approves.** Implementation delta once approved (increment 3+): pass the sign-out *cause* into `decideSignOutDisposition`; add the dirty-sign-out choice sheet + copy; add *Remove account from this device*; add the launch-time retained-file GC with the retention window; fold the retained-local-data question into **SEC-OQ-1**. Preserves and does not close SEC-OQ-1, SEC-RESID-1, OQ-3, OQ-9/DEP-4, UX-OQ-4, ISS-28, CE-R1, CE-R2.
