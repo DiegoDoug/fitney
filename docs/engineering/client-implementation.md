@@ -723,6 +723,15 @@ Attempted via the connected Supabase MCP server:
 
 **Carried to increment 3 (§14.9.5):** a human reads `GET /v1/projects/oaubwbvoaydveguqjovq/config/auth` (or the dashboard), confirms `password_*`, `mailer_autoconfirm`, HIBP, rate limits, and adds `fitney://auth/callback` (+ Expo Go variants) to `uri_allow_list`.
 
-#### CE-R6 — non-client-PR verification
+#### CE-R6 — non-client-PR verification (PASSED)
 
-The commit carrying §14.13–14.14 touches **`docs/`, `.github/workflows/`, `.project-memory/`** — **no `client/**` path**. Observed on that commit's SHA: **see the final report / PR #2 check rollup** — after the `client-verify.yml` path-filter removal, `full-app-typecheck` + `logic-tests` are expected to run and report on a non-client commit (previously they would have been skipped, leaving the now-required checks "Expected — waiting" and blocking merge). This is the live confirmation that CE-R6's two parts are consistent.
+Commit **`e0fec10`** (ADR-0009 amendment + §14.13–14.14 + roadmap + mirror) touches **`docs/`, `development-roadmap.md`, `.project-memory/`** — **no `client/**` path**. Observed on that exact SHA in the PR #2 check rollup:
+
+| check | on `e0fec10` (non-client) |
+|---|---|
+| `full-app-typecheck` | ✅ **SUCCESS — it ran** (before the path-filter removal it would have been *skipped*, leaving the now-required check "Expected — waiting" and blocking merge) |
+| `logic-tests` | ✅ **SUCCESS — it ran** |
+| `db-verify` | ✅ SUCCESS |
+| `mergeStateStatus` | `CLEAN` |
+
+CE-R6's two parts are consistent: `client-verify.yml` (no `pull_request` path filter) runs `full-app-typecheck` + `logic-tests` on **every** PR commit, and ruleset `22205300` now **requires** all three. A non-client PR receives — and is gated by — the client checks.
