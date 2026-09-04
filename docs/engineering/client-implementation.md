@@ -554,7 +554,7 @@ gh api --method PUT repos/DiegoDoug/fitney/rulesets/22205300 \
 
 1. `client/.env` populated with the `fitney-dev` **client-safe** URL + anon key (never a service-role key).
 2. `fitney://auth/callback` + Expo Go redirect variants allow-listed in `fitney-dev` Auth settings.
-3. Read-only confirmation of `fitney-dev` GoTrue state: `enable_confirmations`, leaked-password protection, user-enumeration protection, rate limits (SEC-REQ-AUTH-02/03).
+3. Read-only confirmation of the **effective** `fitney-dev` GoTrue state — **`config.toml` alone does not establish it** (a dashboard change or an un-pushed config can diverge). Read the live Auth settings (Management API / dashboard, read-only): `enable_confirmations`, the **effective password policy** (`minimum_password_length` + `password_requirements`), leaked-password protection, user-enumeration protection, rate limits (SEC-REQ-AUTH-02/03). Reconcile `PASSWORD_POLICY_HINT` + `validatePassword` to whatever is actually enforced.
 4. 2–3 **synthetic** throwaway test accounts scoped to `fitney-dev` (never real credentials, never production).
 5. `SUPABASE_ACCESS_TOKEN` for any CLI `--linked` step (WORK-013 / WORK-020 cross-run) — a human step; keep to `fitney-dev`.
 6. **Hardware**: an iOS Simulator + Android emulator (or physical devices) + a Metro dev server for WORK-007 / WORK-010 (Expo runtime, `expo-sqlite` close/re-open, secure-store chunking, deep-link timing, RN 0.81.5 + worklets). Not available in this environment.
@@ -633,3 +633,24 @@ Human review of §14.9–14.10 (no policy or phase approved). Outcomes:
 **Not changed:** no ADR file, no ruleset, no approved-decision record. Phase 5 stays **IN PROGRESS**; the Foundation exit gate stays **open**. All issue IDs preserved (SEC-OQ-1, SEC-RESID-1, OQ-3, OQ-9/DEP-4, UX-OQ-4, ISS-28, CE-R1, CE-R2).
 
 **Files changed this pass:** `client/src/services/auth.ts`, `client/src/features/auth/auth-flow.ts`, `client/app/(auth)/sign-up.tsx`, `client/app/(auth)/reset-password.tsx`, `client/src/services/__tests__/auth.test.ts`, `client/src/features/auth/__tests__/auth-flow.test.ts`, this artifact (§14.9.3, §14.9.5, §14.10, §14.11).
+
+### 14.12 Second-round human review — 2026-09-04 (recommendations, NOT recorded approvals)
+
+The human reviewer states CE-R5 v2 is *ready for approval at the proposal level* and **recommends** authorizing three bounded actions — but explicitly: *"These remain recommendations, not recorded approvals. PR #2's current code and checks have not been independently verified here. Merge authorization and Phase 5 acceptance remain separate."* No implementation, ADR edit, ruleset change, or merge is authorized by this message. Nothing below is applied.
+
+| Item | Recommended authorization (NOT yet granted) |
+|---|---|
+| **CE-R5 v2** | Implement the revised sign-out policy and update ADR-0009 accordingly; keep automatic retention cleanup deferred (to SEC-OQ-1). |
+| **CE-R6** | Apply the workflow change first, then update the required checks using a **freshly fetched** ruleset that preserves existing settings. |
+| **CE-R7** | Ratify the dependency pins; retain WORK-010's runtime verification requirement. |
+
+**Acceptance conditions to carry into implementation (once CE-R5 v2 / CE-R6 / CE-R7 are actually approved):**
+
+1. **Final-sync failure or Cancel restores normal writes and scheduling** — the "freeze local writes" state is strictly scoped to the *Back up & sign out* attempt; on failure, on falling back to Keep/Discard, or on Cancel, local writes and the sync scheduler's local-change trigger are re-enabled before the user returns to the app.
+2. **Cleanup stays account-scoped** — a late account-A operation (a delayed build, a stale sync callback, a retained-file GC pass) can never delete account-B's database or credentials. Enforced by the existing `GenerationGuard` + per-`userId` file naming; the GC MUST filter by `userId != current` AND skip any file with outstanding work, and MUST NOT touch `expo-secure-store` entries for a different user.
+3. **Password rules apply to creation/reset only** — `validatePassword` gates sign-up and password-reset; **sign-in does not re-validate policy** (`validateSignInForm` checks a non-empty password only) so an existing user whose password predates the strengthened rule still authenticates against the server. *(Already true in the shipped code — `AuthFlow.signIn` → `validateSignInForm`, no `validatePassword` call.)*
+4. **The effective hosted password policy must be inspected directly** — `supabase/config.toml` records the *intended* config, not the *effective* `fitney-dev` GoTrue state (a dashboard change or an un-pushed config can diverge). Increment 3 must read the live Auth settings (Management API / dashboard, read-only) and reconcile `PASSWORD_POLICY_HINT` + `validatePassword` to whatever is actually enforced. Added to the §14.9.5 missing-config list.
+
+**CE-R6 refinement accepted:** apply the `client-verify.yml` path-filter change first; then build the ruleset PUT body from a **freshly fetched** `gh api repos/DiegoDoug/fitney/rulesets/22205300` (not the snapshot in §14.9.3) so any ruleset edit made in the meantime is preserved — add only the two `required_status_checks` contexts. The §14.9.3 JSON is a reference for *which two entries to add*, not a body to PUT blind.
+
+**State after this pass:** Phase 5 **IN PROGRESS**; phases 9/10/11 **LOCKED**; Foundation exit gate **open**; PR #2 **not merged**. No governance record marks CE-R5 v2 / CE-R6 / CE-R7 as approved. Issue IDs preserved: SEC-OQ-1, SEC-RESID-1, OQ-3, OQ-9/DEP-4, UX-OQ-4, ISS-28, CE-R1, CE-R2.
