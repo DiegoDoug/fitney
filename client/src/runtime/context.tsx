@@ -30,6 +30,7 @@ import {
   createAuthPort,
   deleteUserDatabase,
   outstandingForUser as nativeOutstandingForUser,
+  discoverRetainedAccounts as nativeDiscoverRetainedAccounts,
 } from './container';
 import type { AppContainer } from './build-container';
 import {
@@ -40,6 +41,7 @@ import {
   type SignOutChoice,
 } from './account-lifecycle';
 import { SignOutController } from './sign-out-controller';
+import { withRetained, withoutRetained, mergeDiscovered, visibleRetained, assertRemovable } from './retained-accounts';
 import { AuthFlow } from '@/features/auth/auth-flow';
 import type { OnboardingInput, OnboardingDraft } from '@/features/onboarding/onboarding-service';
 import { consoleLogger } from '@/services/logger';
@@ -102,11 +104,16 @@ export type AuthContextValue = {
   /** called by the (future) delete-account flow AFTER a confirmed server deletion */
   confirmAccountDeleted(): Promise<void>;
   /**
-   * A previous session was retained on this device (involuntary end, or the user
-   * chose "keep on this device"). Non-null only when it is NOT the active account.
+   * Every account retained on this device (involuntary end, or the user chose
+   * "keep on this device"), NOT including the active account. Re-derived from
+   * the on-disk per-user DB files on every cold boot (CE-R5 v2 discovery), so
+   * it survives an app restart and accumulates correctly across repeated
+   * account switches — it is not just in-session memory.
    */
-  retainedAccount: string | null;
-  /** count outstanding work for the retained account (for the removal confirm) */
+  retainedAccounts: string[];
+  /** count outstanding work for a retained account (for the removal confirm).
+   *  Resolves to `null` if the file cannot be read (unknown risk — the UI must
+   *  not claim "0 changes" for an unreadable file). */
   retainedAccountOutstanding(
     userId: string,
   ): Promise<{ outbox: number; openConflicts: number } | null>;
@@ -164,6 +171,7 @@ export type RuntimeProviderProps = {
   outstandingForUser?: (
     userId: string,
   ) => Promise<{ outbox: number; openConflicts: number } | null>;
+  discoverRetainedAccounts?: (activeUserId: string | null) => Promise<string[]>;
 };
 
 export function RuntimeProvider({
@@ -173,13 +181,14 @@ export function RuntimeProvider({
   buildContainer,
   dropDatabase,
   outstandingForUser,
+  discoverRetainedAccounts,
 }: RuntimeProviderProps) {
   const [phase, setPhase] = useState<InternalPhase>({ kind: 'bootstrapping' });
   const [unsyncedNotice, setUnsyncedNotice] = useState(false);
   const [signOutPrompt, setSignOutPrompt] = useState<{ outbox: number; openConflicts: number } | null>(
     null,
   );
-  const [retainedAccount, setRetainedAccount] = useState<string | null>(null);
+  const [retainedAccounts, setRetainedAccounts] = useState<string[]>([]);
 
   // --- stable singletons ---------------------------------------------------
   const guardRef = useRef(new GenerationGuard());
@@ -196,6 +205,16 @@ export function RuntimeProvider({
   const buildFn = buildContainer ?? nativeBuildContainer;
   const dropFn = dropDatabase ?? deleteUserDatabase;
   const outstandingForUserFn = outstandingForUser ?? nativeOutstandingForUser;
+  const discoverRetainedFn = discoverRetainedAccounts ?? nativeDiscoverRetainedAccounts;
+
+  const addRetained = (userId: string) => {
+    if (!mountedRef.current) return;
+    setRetainedAccounts((prev) => withRetained(prev, userId));
+  };
+  const removeRetained = (userId: string) => {
+    if (!mountedRef.current) return;
+    setRetainedAccounts((prev) => withoutRetained(prev, userId));
+  };
 
   const port = useMemo<AuthPort>(() => {
     if (authPort) return authPort;
@@ -270,11 +289,11 @@ export function RuntimeProvider({
     void userId;
     if (mountedRef.current) {
       setUnsyncedNotice(notify);
-      // track / clear the retained-file marker for "Remove account from this device"
-      setRetainedAccount((prev) => {
-        if (retained) return active.userId;
-        return prev === active.userId ? null : prev;
-      });
+      // track / clear the retained-file marker for "Remove account from this device".
+      // Accumulates across repeated switches (A retained, then B retained too) —
+      // never overwrites a different account's entry.
+      if (retained) addRetained(active.userId);
+      else removeRetained(active.userId);
     }
   };
 
@@ -313,8 +332,10 @@ export function RuntimeProvider({
       return;
     }
 
-    // re-authentication reactivates a retained file as the active DB (CE-R5 v2)
-    if (mountedRef.current) setRetainedAccount((prev) => (prev === userId ? null : prev));
+    // re-authentication reactivates a retained file as the active DB (CE-R5 v2) —
+    // draining its outbox is normal sync, not a removal; it just stops being
+    // "retained" because it is the active account again.
+    removeRetained(userId);
 
     safeSetPhase(
       needsOnboarding
@@ -375,6 +396,24 @@ export function RuntimeProvider({
     return chainRef.current;
   };
 
+  // --- discover retained accounts on cold boot (CE-R5 v2) -------------------
+  // The on-disk per-user DB files ARE the persistence — a restart has no other
+  // record of what was retained, so this re-derives the set by listing rather
+  // than trusting any carried-over app state. Runs once; `activate()` / `retire()`
+  // keep it correct afterward without re-listing.
+  useEffect(() => {
+    let cancelled = false;
+    void discoverRetainedFn(activeRef.current?.userId ?? null).then((ids) => {
+      if (cancelled || !mountedRef.current || ids.length === 0) return;
+      setRetainedAccounts((prev) => mergeDiscovered(prev, ids));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // runs once at mount — discovery is a snapshot; subsequent changes are
+    // tracked incrementally by retire()/activate()/removeAccountFromDevice.
+  }, []);
+
   // --- subscribe to auth lifecycle -----------------------------------------
   useEffect(() => {
     mountedRef.current = true;
@@ -431,18 +470,13 @@ export function RuntimeProvider({
         await flow.signOut().catch(() => {}); // server graph already gone; local drop is authoritative
         if (activeRef.current) void run({ type: 'SIGNED_OUT' });
       },
-      retainedAccount:
-        retainedAccount && retainedAccount !== activeRef.current?.userId ? retainedAccount : null,
+      retainedAccounts: visibleRetained(retainedAccounts, activeRef.current?.userId ?? null),
       retainedAccountOutstanding: (userId: string) => outstandingForUserFn(userId),
       removeAccountFromDevice: async (userId: string) => {
-        if (userId === activeRef.current?.userId) {
-          throw new Error('cannot remove the active account from this device — sign out first');
-        }
+        assertRemovable(userId, activeRef.current?.userId ?? null);
         await dropFn(userId);
         consoleLogger.log('warn', 'runtime.account.removed_from_device', { id8: userId.slice(0, 8) });
-        if (mountedRef.current) {
-          setRetainedAccount((prev) => (prev === userId ? null : prev));
-        }
+        removeRetained(userId);
       },
       handleAuthDeepLink: async (url: string) => {
         try {
@@ -465,7 +499,7 @@ export function RuntimeProvider({
       },
       flow,
     };
-  }, [phase, unsyncedNotice, signOutPrompt, retainedAccount, flow, dropFn, outstandingForUserFn]);
+  }, [phase, unsyncedNotice, signOutPrompt, retainedAccounts, flow, dropFn, outstandingForUserFn]);
 
   return (
     <RuntimeContext.Provider value={publicState}>

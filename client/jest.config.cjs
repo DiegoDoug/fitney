@@ -25,6 +25,11 @@ module.exports = {
     '/node_modules/',
     '\\.native\\.test\\.ts$',
     '/src/data/remote/__tests__/gateway\\.',
+    // opt-in hosted-only suites (jest.hosted.config.cjs) import data/remote/gateway.ts
+    // + data/remote/auth-gateway.ts, which tsconfig.logic.json deliberately excludes —
+    // never run these under the logic-tsconfig CI project (they'd fail to compile here
+    // even though they'd runtime-skip; run them via jest.hosted.config.cjs instead).
+    '/__tests__/hosted/',
   ],
   clearMocks: true,
 };

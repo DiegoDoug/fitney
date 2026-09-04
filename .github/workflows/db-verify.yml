@@ -46,8 +46,14 @@ jobs:
         with:
           version: 2.67.1
 
-      - name: Start local database
-        run: supabase db start
+      # `supabase db start` only boots the bare Postgres container — fine for
+      # the lint/pgTAP steps below (direct DB connection only), but the
+      # ISS-29/WORK-013 hosted-tier jest steps need the REST/Auth gateway too
+      # (they sign in via @supabase/supabase-js against http://127.0.0.1:54321,
+      # exactly like the client app does) — `supabase start` boots the full
+      # local stack (Postgres + GoTrue + PostgREST + Kong) that requires.
+      - name: Start local Supabase stack
+        run: supabase start
 
       - name: Apply migration chain from scratch (+ seed)
         run: supabase db reset --local
@@ -57,6 +63,38 @@ jobs:
 
       - name: Run pgTAP suites (supabase/tests/01..04)
         run: supabase test db
+
+      # ISS-29 (DEC-55, 2026-09-04): sync_apply's optimistic-concurrency check
+      # was a TOCTOU race under true concurrent writers, only reproducible via
+      # genuinely concurrent requests — a single-threaded pgTAP script can't
+      # exercise this, so it's gated here instead, against the SAME local
+      # Postgres this job already started. "Random repeated runs alone are
+      # insufficient" (DEC-55) — this asserts the exact invariant broken by
+      # the old migration (exactly one applied / one conflict / one version
+      # increment), not just "it passed this time."
+      - name: Set up Node for the ISS-29 concurrency regression + WORK-013 harnesses
+        uses: actions/setup-node@v4
+        with:
+          # @supabase/supabase-js's RealtimeClient requires a native WebSocket
+          # implementation, only built into Node 22+ (Node 20 throws
+          # "native WebSocket not found" the moment createClient() runs).
+          node-version: 22
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: ISS-29 concurrency regression (ADR-0009 gap) — two-session sync_apply race
+        working-directory: client
+        run: npx jest --config jest.hosted.config.cjs sync-apply-concurrency
+
+      - name: WORK-013 late-transaction-commit reconciliation (session-capable local Postgres harness)
+        working-directory: client
+        run: npx jest --config jest.hosted.config.cjs late-commit-reconciliation
+
+      - name: WORK-013 same-timestamp page boundary at the real PAGE=200 size
+        working-directory: client
+        run: npx jest --config jest.hosted.config.cjs page-boundary-200
 
       - name: Stop database
         if: always()

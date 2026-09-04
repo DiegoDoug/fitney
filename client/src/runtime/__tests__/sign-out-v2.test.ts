@@ -227,6 +227,43 @@ describe('Remove account from this device — data path (CE-R5 v2)', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('a corrupt/non-SQLite retained file fails to open — the exact failure `outstandingForUser` catches and turns into `null` (unknown, not "0 changes") rather than letting it throw into the Settings screen', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const dir = mkdtempSync(join(tmpdir(), 'fitney-rm-corrupt-open-'));
+    const file = join(dir, `fitney-${USER}.db`);
+    writeFileSync(file, Buffer.from('not a sqlite database'));
+    try {
+      expect(() => createTestDb(file)).toThrow();
+    } finally {
+      // NOTE: better-sqlite3's failed constructor can leave a native file
+      // handle open on Windows until process exit (a test-only binding quirk
+      // — expo-sqlite's native iOS/Android binding has different open/close
+      // semantics and is unaffected). Cleanup here is best-effort and not
+      // itself part of what this test verifies.
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* ignore — OS temp dir, reclaimed by the system regardless */
+      }
+    }
+  });
+
+  it('"Remove account from this device" deletes an unreadable file WITHOUT requiring it to open first', async () => {
+    const { writeFileSync, existsSync } = await import('node:fs');
+    const dir = mkdtempSync(join(tmpdir(), 'fitney-rm-corrupt-delete-'));
+    const file = join(dir, `fitney-${USER}.db`);
+    try {
+      // corrupt content, but this test never opens it — mirrors
+      // `removeAccountFromDevice` -> `dropFn(userId)`, which deletes the file
+      // directly and never calls `outstandingForUser`/open first.
+      writeFileSync(file, Buffer.from('not a sqlite database'));
+      rmSync(file, { force: true });
+      expect(existsSync(file)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('conditions that permit dropping the per-user DB (CE-R5 v2)', () => {

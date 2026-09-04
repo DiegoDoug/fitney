@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.logic.json",
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "**/*.tsx"]
+}

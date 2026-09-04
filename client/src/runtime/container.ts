@@ -8,7 +8,7 @@
  * is typechecked in CI (client-verify full-app job).
  */
 import * as Linking from 'expo-linking';
-import { openDatabase, deleteDatabase } from '@/data/local/driver.native';
+import { openDatabase, deleteDatabase, listRetainedUserIds } from '@/data/local/driver.native';
 import { createSupabaseGateway } from '@/data/remote/gateway';
 import { createSupabaseAuthPort } from '@/data/remote/auth-gateway';
 import { getSupabase } from '@/data/remote/client';
@@ -74,6 +74,15 @@ export function createAuthPort(): AuthPort {
  */
 export async function deleteUserDatabase(userId: string): Promise<void> {
   await deleteDatabase(userDbName(userId));
+}
+
+/**
+ * Discover retained per-user DB files on disk, excluding the active account
+ * (CE-R5 v2 discovery — cold-boot-safe: re-derives from the files themselves,
+ * not from in-memory state carried over a restart).
+ */
+export async function discoverRetainedAccounts(activeUserId: string | null): Promise<string[]> {
+  return listRetainedUserIds(activeUserId);
 }
 
 /**

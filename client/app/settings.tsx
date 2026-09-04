@@ -27,20 +27,26 @@ export default function SettingsScreen() {
     unsyncedNotice,
     signOutPrompt,
     resolveSignOutPrompt,
-    retainedAccount,
+    retainedAccounts,
     retainedAccountOutstanding,
     removeAccountFromDevice,
   } = useAuth();
   const [pending, setPending] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // keyed by userId — each retained account gets its own confirm step
   const [removeState, setRemoveState] = useState<
-    | { step: 'idle' }
-    | { step: 'confirm'; outstanding: { outbox: number; openConflicts: number } | null }
-  >({ step: 'idle' });
+    Record<string, { outstanding: { outbox: number; openConflicts: number } | null } | undefined>
+  >({});
 
   useEffect(() => {
-    if (!retainedAccount) setRemoveState({ step: 'idle' });
-  }, [retainedAccount]);
+    // drop confirm state for any account that is no longer retained (removed,
+    // or reactivated by re-authenticating)
+    setRemoveState((prev) => {
+      const next: typeof prev = {};
+      for (const id of retainedAccounts) if (prev[id]) next[id] = prev[id];
+      return next;
+    });
+  }, [retainedAccounts]);
 
   const onSignOut = async () => {
     if (pending) return;
@@ -58,24 +64,27 @@ export default function SettingsScreen() {
 
   const n = signOutPrompt ? signOutPrompt.outbox + signOutPrompt.openConflicts : 0;
 
-  const openRemoveConfirm = async () => {
-    if (!retainedAccount || pending) return;
+  const openRemoveConfirm = async (userId: string) => {
+    if (pending) return;
     setPending(true);
-    const outstanding = await retainedAccountOutstanding(retainedAccount).catch(() => null);
+    const outstanding = await retainedAccountOutstanding(userId).catch(() => null);
     setPending(false);
-    setRemoveState({ step: 'confirm', outstanding });
+    setRemoveState((prev) => ({ ...prev, [userId]: { outstanding } }));
   };
-  const doRemove = async () => {
-    if (!retainedAccount || pending) return;
+  const cancelRemoveConfirm = (userId: string) => {
+    setRemoveState((prev) => {
+      const next = { ...prev };
+      delete next[userId];
+      return next;
+    });
+  };
+  const doRemove = async (userId: string) => {
+    if (pending) return;
     setPending(true);
-    await removeAccountFromDevice(retainedAccount).catch(() => {});
+    await removeAccountFromDevice(userId).catch(() => {});
     setPending(false);
-    setRemoveState({ step: 'idle' });
+    cancelRemoveConfirm(userId);
   };
-  const removeN =
-    removeState.step === 'confirm' && removeState.outstanding
-      ? removeState.outstanding.outbox + removeState.outstanding.openConflicts
-      : null;
 
   return (
     <Screen>
@@ -147,39 +156,53 @@ export default function SettingsScreen() {
           </AppSurface>
         )}
 
-        {retainedAccount ? (
+        {retainedAccounts.length > 0 ? (
           <AppSurface role="raised-1" style={{ borderColor: t.colors.borderStrong, borderWidth: 1 }}>
             <AppText token="caption" color="textMuted">
               RETAINED ON THIS DEVICE
             </AppText>
-            <AppText token="body">{`${retainedAccount.slice(0, 8)}… — local data kept`}</AppText>
-            <View style={{ height: t.spacing.md }} />
-            {removeState.step === 'idle' ? (
-              <PrimaryButton
-                label={pending ? 'Checking…' : 'Remove account from this device'}
-                variant="secondary"
-                loading={pending}
-                onPress={openRemoveConfirm}
-              />
-            ) : (
-              <View style={{ gap: t.spacing.sm }}>
-                <FormBanner
-                  variant="error"
-                  message={
-                    removeN != null
-                      ? `Permanently delete this device's local data for that account, including ${removeN} unsynced change${removeN === 1 ? '' : 's'}? This can't be undone.`
-                      : `Permanently delete this device's local data for that account, including any unsynced changes? This can't be undone.`
-                  }
-                />
-                <PrimaryButton label="Delete local data" variant="destructive" loading={pending} onPress={doRemove} />
-                <PrimaryButton
-                  label="Back"
-                  variant="secondary"
-                  disabled={pending}
-                  onPress={() => setRemoveState({ step: 'idle' })}
-                />
-              </View>
-            )}
+            {retainedAccounts.map((userId) => {
+              const confirming = removeState[userId];
+              const removeN = confirming?.outstanding
+                ? confirming.outstanding.outbox + confirming.outstanding.openConflicts
+                : null;
+              return (
+                <View key={userId} style={{ gap: t.spacing.sm, paddingTop: t.spacing.sm }}>
+                  <AppText token="body">{`${userId.slice(0, 8)}… — local data kept`}</AppText>
+                  {!confirming ? (
+                    <PrimaryButton
+                      label={pending ? 'Checking…' : 'Remove account from this device'}
+                      variant="secondary"
+                      loading={pending}
+                      onPress={() => openRemoveConfirm(userId)}
+                    />
+                  ) : (
+                    <View style={{ gap: t.spacing.sm }}>
+                      <FormBanner
+                        variant="error"
+                        message={
+                          removeN != null
+                            ? `Permanently delete this device's local data for that account, including ${removeN} unsynced change${removeN === 1 ? '' : 's'}? This can't be undone.`
+                            : `Permanently delete this device's local data for that account, including any unsynced changes? This can't be undone.`
+                        }
+                      />
+                      <PrimaryButton
+                        label="Delete local data"
+                        variant="destructive"
+                        loading={pending}
+                        onPress={() => doRemove(userId)}
+                      />
+                      <PrimaryButton
+                        label="Back"
+                        variant="secondary"
+                        disabled={pending}
+                        onPress={() => cancelRemoveConfirm(userId)}
+                      />
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </AppSurface>
         ) : null}
       </View>

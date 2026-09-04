@@ -1,0 +1,29 @@
+{
+  "_evidence": "WORK-013 remaining hosted scenarios (concurrent writers, clock skew, kill-mid-push replay, lost-transport-response+successor, same-timestamp page boundary), run against REAL fitney-dev via client/src/data/sync/__tests__/hosted/sync-hosted.hosted.test.ts, driving the PRODUCTION data/sync/{push,pull}.ts functions with the REAL createSupabaseGateway. See docs/engineering/client-implementation.md SS14.17 for narrative and the two cases NOT covered (mobile-runtime vs tool-access blockers).",
+  "runsPerformed": 7,
+  "results": {
+    "clockSkew": "PASS (deterministic) — server version, not local clock, decided the winner in every run.",
+    "killMidPushReplay": "PASS (deterministic) — the crash-simulated dispatched-but-unsent entry retried and applied exactly once on the first real attempt.",
+    "lostTransportResponseWithSuccessor": "PASS (deterministic) — retry against the real server correctly returned 'duplicate', and the concurrent successor was re-based to the true server version, not re-sent in the same pass.",
+    "sameTimestampPageBoundary": "PASS (deterministic) — two rows sharing one Postgres transaction-time updated_at were both correctly applied via the (updated_at,id) composite cursor tie-break; the cursor advanced to the later id, no skip or duplicate re-apply.",
+    "concurrentWriters": "NON-DETERMINISTIC — PASSED (exactly one applied, one conflict, final version 2) in 6 of 7 runs. FAILED ONCE: both concurrent pushes reported status 'applied', final row version reached 3 (not 2) — i.e. the second writer's edit silently overwrote the first's without ever being flagged as a conflict."
+  },
+  "concurrentWritersFailureReproduction": {
+    "r1": { "attempted": 1, "applied": 1, "duplicate": 0, "conflicts": 0, "parked": 0, "rejected": 0, "transportFailures": 0 },
+    "r2": { "attempted": 1, "applied": 1, "duplicate": 0, "conflicts": 0, "parked": 0, "rejected": 0, "transportFailures": 0 },
+    "finalRow": { "version": 3, "name_snapshot": "device 1 edit" },
+    "expected": "exactly one of r1/r2 should report applied:1, the other conflicts:1; finalRow.version should be 2",
+    "observed_rate": "1 of 7 full-suite / isolated runs (~14% in this small sample) — narrow, timing-dependent race window"
+  },
+  "rootCauseAnalysis": {
+    "location": "supabase/migrations/20260902090006_security_hardening.sql, sync_apply() UPDATE branch (S-8 hardened version, ~line 285-298)",
+    "mechanism": "`execute format('select version from %I where id = $1', v_table) into v_current using p_entity_id;` is a PLAIN SELECT (no `FOR UPDATE` row lock). Under READ COMMITTED (Postgres default), two genuinely concurrent transactions can BOTH read the same pre-update `v_current` before either commits. Both then satisfy `v_current = p_base_version` and both proceed to `execute format('update %1$I t set %2$s ... where t.id = $2 returning t.version', ...)`. That UPDATE's WHERE clause matches ONLY `t.id = $2` — it does NOT re-check `t.version = p_base_version` at the row-lock level. Postgres correctly serializes the two UPDATEs via the row's write lock (the second blocks until the first commits), but by the time the second UPDATE actually runs, it unconditionally overwrites the row again (the trigger sets `new.version := old.version + 1`) — it never re-validates the version it already (stale) decided was current in the earlier SELECT. Net effect: the SECOND writer's edit silently wins over the FIRST's, incrementing version twice (1->2->3) with NEITHER writer ever seeing a 'conflict' — the update-time optimistic-concurrency check is a classic check-then-act (TOCTOU) race, not an atomic compare-and-swap.",
+    "fix_recommendation": "Make the UPDATE's WHERE clause itself the version guard, e.g. `where t.id = $2 and t.version = $3 returning t.version` (bind p_base_version as $3), then check `if not found then` treat as a conflict (re-select the current row + version) rather than trusting the earlier plain SELECT. Equivalently, `select version from %I where id = $1 for update` would serialize the two readers at the SELECT itself, making the second transaction block until the first commits and then correctly observe the new version — but the WHERE-clause guard is simpler and needs no explicit lock statement.",
+    "owner": "backend-data-engineering / security-identity (sync_apply is their owned artifact; client-engineering does not modify it)",
+    "status": "REPORTED, NOT FIXED — routed, not applied. No SQL was changed by this verification pass."
+  },
+  "cleanup": {
+    "synthetic_user": "fitney-verify-sync-a2@fitney-hosted-verify.com — deleted (auth.users, auth.identities, profiles) after the run",
+    "leftover_rows_after_cleanup": 0
+  }
+}
