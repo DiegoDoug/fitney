@@ -69,7 +69,10 @@ jobs:
       - name: Set up Node for the ISS-29 concurrency regression + WORK-013 harnesses
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # @supabase/supabase-js's RealtimeClient requires a native WebSocket
+          # implementation, only built into Node 22+ (Node 20 throws
+          # "native WebSocket not found" the moment createClient() runs).
+          node-version: 22
 
       - name: Install client dependencies
         working-directory: client
