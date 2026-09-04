@@ -1,0 +1,75 @@
+{
+  "_evidence": "WORK-013 sync-protocol conformance + WORK-020 client/server golden-vector cross-run, run against REAL hosted fitney-dev (oaubwbvoaydveguqjovq) via client/scripts/hosted-verify.mjs, using the exact sync_apply RPC contract client/src/data/remote/gateway.ts calls. Synthetic test accounts + all rows created by this run were deleted afterward (see docs/engineering/client-implementation.md §14.16 for the cleanup query and full narrative).",
+  "startedAt": "2026-09-04T15:44:43.833Z",
+  "auth": {
+    "signInA": { "ok": true, "error": null },
+    "signInB": { "ok": true, "error": null }
+  },
+  "syncApply": {
+    "profileInsert": { "status": "applied", "version": 1 },
+    "sessionInsert": { "status": "applied", "version": 1 },
+    "sessionExerciseInsert": { "status": "applied", "version": 1 },
+    "performedSetInserts": [
+      { "status": "applied", "version": 1 },
+      { "status": "applied", "version": 1 },
+      { "status": "applied", "version": 1 }
+    ],
+    "dedupe": { "first": { "status": "applied", "version": 1 }, "replay": { "status": "duplicate", "version": 1 }, "sameVersion": true, "replayStatusIsDuplicate": true },
+    "sessionComplete": { "status": "applied", "version": 2 },
+    "idempotentResubmit": { "status": "applied", "version": 2 },
+    "staleConflict": {
+      "row": {
+        "id": "fcea8a90-389d-440c-a40c-117d1067798c",
+        "notes": null,
+        "source": "empty",
+        "status": "completed",
+        "user_id": "c80ba199-762e-4af8-bb39-85d99572438e",
+        "version": 2,
+        "ended_at": "2026-08-31T11:00:00+00:00",
+        "timezone": "UTC",
+        "created_at": "2026-09-04T15:44:45.784766+00:00",
+        "deleted_at": null,
+        "started_at": "2026-08-31T10:00:00+00:00",
+        "updated_at": "2026-09-04T15:44:46.53937+00:00",
+        "name_snapshot": "Hosted Verify Session",
+        "rest_timer_anchor": null,
+        "planned_workout_id": null
+      },
+      "status": "conflict",
+      "version": 2
+    },
+    "crossTenantDenied": { "status": "rejected" },
+    "tombstone": { "status": "applied", "version": 2 },
+    "unknownEntityRejected": { "error": "sync_apply: unknown entity", "code": "22023" }
+  },
+  "recompute": {
+    "preTombstone": {
+      "maxLoad": 110,
+      "est1rm": 129.8333,
+      "est1rmFormulaId": "epley",
+      "est1rmFormulaVersion": 1,
+      "sessionVolumePr": 1430,
+      "repPrs": [
+        { "rep": 1, "value": 110 },
+        { "rep": 5, "value": 100 },
+        { "rep": 8, "value": 102.5 }
+      ],
+      "weeklyWorkingVolume": 1430,
+      "weeklyWorkingSets": 3,
+      "exerciseWeeklyBestE1rm": 129.8333
+    },
+    "matchesClientGoldenVectors": true,
+    "idempotent": true,
+    "maxLoadAfterTombstone": 102.5,
+    "maxLoadReactedToTombstone": true
+  },
+  "finishedAt": "2026-09-04T15:44:46.762Z",
+  "postRunCleanup": {
+    "leftover_users": 0,
+    "prs": 0,
+    "weekly": 0,
+    "sessions": 0,
+    "sets": 0
+  },
+  "securityAdvisorAfterCleanup": "unchanged — only the intentional deletion_receipts RLS-no-policy INFO"
+}

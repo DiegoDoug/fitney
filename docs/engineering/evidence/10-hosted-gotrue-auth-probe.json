@@ -1,0 +1,36 @@
+{
+  "_evidence": "Hosted GoTrue auth/recovery empirical probe against REAL fitney-dev (oaubwbvoaydveguqjovq) via client/scripts/hosted-verify.mjs's signUp/resetPasswordForEmail calls (NOT the Management API config endpoint, which this session has no access to — see docs/engineering/client-implementation.md §14.16 for why that inspection stays BLOCKED). No synthetic auth.users rows were left behind: none of these calls succeeded far enough to write one (confirmed via `select * from auth.users where email like 'fitney-verify-%'` = 0 rows before the second, SQL-seeded run).",
+  "run1_at": "2026-09-04T15:39:14Z",
+  "run2_at": "2026-09-04T15:40:46Z (20s later, same result — rate limit had not cleared)",
+  "findings": {
+    "exampleDotComRejected": {
+      "observed": "signUp({ email: '...@example.com', ... }) -> error: 'Email address \"...@example.com\" is invalid'",
+      "meaning": "hosted GoTrue rejects the RFC 2606 reserved example.com domain outright (a built-in denylist, not a project-specific setting) — real, reproducible."
+    },
+    "authRateLimit": {
+      "observed": "After ~4 signUp/resetPasswordForEmail calls in under a second, all further signUp attempts (including on a different, non-example.com domain, in a SEPARATE process run 92s later) returned 'email rate limit exceeded'.",
+      "meaning": "Auth-endpoint rate limiting IS active on fitney-dev and its window is tight enough to exhaust with light, non-adversarial automated use. Matches WORK-019's 'auth rate limits' hardening intent, but the exact limit/window is not itself exposed by any tool available to this session — only its existence and approximate tightness are empirically confirmed."
+    },
+    "minimumPasswordLength": {
+      "observed": "signUp with password 'Ab1' (3 chars) -> error: 'Password should be at least 6 characters.' This validation ran and returned BEFORE hitting the rate limiter (distinct error), even in the run where every other call was rate-limited.",
+      "meaning": "Hosted effective minimum_password_length = 6.",
+      "discrepancyWithDeclaredIntent": "supabase/config.toml declares minimum_password_length = 8 and password_requirements = \"lower_upper_letters_digits\" as the INTENDED hosted policy (SEC-C2 hardening) — but config.toml is the LOCAL dev config file and is never pushed to hosted auth settings by `supabase db push` / `db reset --linked` (those apply migrations only). This is a CONCRETE, empirically-confirmed gap: hosted fitney-dev's actual password policy (min 6, no confirmed complexity requirement) does not match the declared SEC-C2 intent (min 8, lower+upper+digit). SEC-C2 hosted auth hardening has not been applied to this project."
+    },
+    "passwordComplexityRequirement": {
+      "observed": "Inconclusive — the one syntactically-valid-length weak-complexity probe ('weakpw1', 8 chars, no uppercase) was itself rate-limited before its content could be validated.",
+      "meaning": "Whether hosted enforces 'lower_upper_letters_digits' is UNVERIFIED, not confirmed either way."
+    },
+    "emailConfirmationRequired": {
+      "observed": "Every signUp attempt in both runs either failed on domain rejection or was rate-limited; none reached a state where a real account's session/confirmation status could be observed.",
+      "meaning": "UNKNOWN / UNVERIFIED. Do not treat the later synthetic-account creation via direct `execute_sql` (email_confirmed_at set manually, to unblock the sync_apply/recompute cross-run) as evidence of the DEFAULT policy — that was a deliberate bypass of the normal signUp path, not an observation of it."
+    },
+    "recoveryLinkRedirectValidation": {
+      "observed": "resetPasswordForEmail(emailA, { redirectTo: 'fitney://auth/callback' }) -> error: null (no synchronous rejection), and the same for a non-existent email.",
+      "meaning": "Inconclusive at the synchronous API level — GoTrue does not validate/reject a non-allow-listed redirectTo in the resetPasswordForEmail response itself (any rejection, if the round-1 config.toml-based finding holds, would happen out-of-band when generating the actual email link). The best evidence for 'fitney://auth/callback is not in additional_redirect_urls' remains the static config.toml read from round 1, not this probe."
+    },
+    "enumerationProtection": {
+      "observed": "Both the real-email and non-existent-email resetPasswordForEmail calls returned identically (error: null) — no observable difference.",
+      "meaning": "Consistent with (does not contradict) Supabase's standard no-enumeration-on-recovery behavior."
+    }
+  }
+}
