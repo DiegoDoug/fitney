@@ -54,4 +54,35 @@ describe('local migration runner', () => {
     expect(idx).toHaveLength(1);
     await db.closeAsync();
   });
+
+  it('m0002 adds the local-only onboarding marker to profiles (fresh + upgrade paths)', async () => {
+    const hasCol = async (db: Awaited<ReturnType<typeof createTestDb>>) => {
+      const cols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(profiles)`);
+      return cols.some((c) => c.name === 'onboarding_completed_at');
+    };
+
+    // fresh install at HEAD
+    const fresh = createTestDb();
+    await migrate(fresh);
+    expect(await hasCol(fresh)).toBe(true);
+    await fresh.closeAsync();
+
+    // upgrade from a v1-only install
+    const upgraded = createTestDb();
+    await migrate(upgraded, MIGRATIONS.slice(0, 1));
+    expect(await hasCol(upgraded)).toBe(false);
+    const res = await migrate(upgraded, MIGRATIONS);
+    expect(res.from).toBe(1);
+    expect(res.applied).toEqual([2]);
+    expect(await hasCol(upgraded)).toBe(true);
+    // existing rows survive the ALTER with a NULL marker
+    await upgraded.runAsync(
+      `INSERT INTO profiles (id, user_id, version, dirty, local_updated_at) VALUES ('u','u',1,0,0)`,
+    );
+    const row = await upgraded.getFirstAsync<{ onboarding_completed_at: number | null }>(
+      `SELECT onboarding_completed_at FROM profiles WHERE id = 'u'`,
+    );
+    expect(row?.onboarding_completed_at ?? null).toBeNull();
+    await upgraded.closeAsync();
+  });
 });

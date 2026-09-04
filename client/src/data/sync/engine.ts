@@ -43,6 +43,7 @@ export class SyncEngine {
   private running: Promise<SyncRunResult> | null = null;
   private queuedTrigger: SyncTrigger | null = null;
   private indicator: SyncIndicatorState = 'saved';
+  private disposed = false;
 
   constructor(
     private readonly deps: {
@@ -60,8 +61,26 @@ export class SyncEngine {
     return this.indicator;
   }
 
+  /**
+   * Retire this engine — called when the per-user runtime is torn down on
+   * sign-out / account switch (ADR-0009). After this, `requestSync` is inert and
+   * any in-flight run's result is discarded by the caller. The engine holds no
+   * timers of its own; stopping = "make no further network calls for account A".
+   */
+  stop(): void {
+    this.disposed = true;
+    this.queuedTrigger = null;
+  }
+
+  isStopped(): boolean {
+    return this.disposed;
+  }
+
   /** Single-flight: a request while a run is active is coalesced into one re-run. */
   async requestSync(trigger: SyncTrigger): Promise<SyncRunResult> {
+    if (this.disposed) {
+      return { push: emptyPush(), pull: emptyPull(), reconciled: false, indicator: this.indicator };
+    }
     if (this.running) {
       this.queuedTrigger = trigger;
       return this.running;
@@ -70,7 +89,7 @@ export class SyncEngine {
       this.running = null;
       const q = this.queuedTrigger;
       this.queuedTrigger = null;
-      if (q) void this.requestSync(q);
+      if (q && !this.disposed) void this.requestSync(q);
     });
     return this.running;
   }

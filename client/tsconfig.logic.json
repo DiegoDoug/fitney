@@ -26,13 +26,16 @@
     "src/data/repositories/**/*.ts",
     "src/data/remote/schemas/**/*.ts",
     "src/features/**/*.ts",
+    "src/runtime/**/*.ts",
     "src/test/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "**/*.tsx",
     "src/data/remote/gateway.ts",
+    "src/data/remote/auth-gateway.ts",
     "src/data/remote/session-storage.ts",
+    "src/runtime/container.ts",
     "src/services/impl/**/*.native.ts"
   ]
 }

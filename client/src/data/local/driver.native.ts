@@ -11,6 +11,19 @@
 import * as SQLite from 'expo-sqlite';
 import { runInTransaction, type SqlDatabase, type SqlValue } from './driver';
 
+/**
+ * Delete a per-user SQLite file (ADR-0009 clean sign-out / account deletion).
+ * The handle must be closed first. A missing file is not an error.
+ */
+export async function deleteDatabase(name: string): Promise<void> {
+  try {
+    await SQLite.deleteDatabaseAsync(name);
+  } catch {
+    // already gone / never created — fine. A locked file is retried on the next
+    // clean sign-out; never throw into the account transition.
+  }
+}
+
 export async function openDatabase(name: string): Promise<SqlDatabase> {
   const db = await SQLite.openDatabaseAsync(name, { useNewConnection: true });
   await db.execAsync('PRAGMA journal_mode = WAL;');

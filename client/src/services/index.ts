@@ -10,6 +10,7 @@ export * from './analytics';
 export * from './config';
 export * from './haptics';
 export * from './unit-formatter';
+export * from './auth';
 
 import type { Clock } from './clock';
 import type { IdGenerator } from './ids';
@@ -18,6 +19,7 @@ import type { Logger } from './logger';
 import type { Analytics } from './analytics';
 import type { Config } from './config';
 import type { Haptics } from './haptics';
+import type { AuthPort } from './auth';
 
 export type Services = {
   clock: Clock;
@@ -27,4 +29,6 @@ export type Services = {
   analytics: Analytics;
   config: Config;
   haptics: Haptics;
+  /** authentication seam (ADR-0009); concrete impl injected at the app root */
+  auth: AuthPort;
 };

@@ -24,6 +24,7 @@ import type { Uuid } from '@/domain/ids';
 import type {
   DerivedRepository,
   ExerciseRepository,
+  OnboardingState,
   PerformedSetRepository,
   ProfileRepository,
   Repositories,
@@ -53,6 +54,48 @@ function profileRepo({ db, clock, ids }: Deps): ProfileRepository {
           nowMs: now,
           newOperationId: ids.newV4(),
         }),
+      );
+    },
+    async getOnboardingState(userId): Promise<OnboardingState> {
+      const r = await db.getFirstAsync<{
+        display_name: string | null;
+        unit_pref: string;
+        week_start: number;
+        default_rest_seconds: number;
+        training_goal: string | null;
+        synced_version: number | null;
+        onboarding_completed_at: number | null;
+      }>(
+        `SELECT display_name, unit_pref, week_start, default_rest_seconds, training_goal,
+                synced_version, onboarding_completed_at
+           FROM profiles WHERE id = ?`,
+        [userId],
+      );
+      if (!r) {
+        return { profileExists: false, completed: false, serverSynced: false, draft: null };
+      }
+      const serverSynced = r.synced_version != null;
+      const completed = r.onboarding_completed_at != null || serverSynced;
+      return {
+        profileExists: true,
+        completed,
+        serverSynced,
+        draft: completed
+          ? null
+          : {
+              displayName: r.display_name ?? '',
+              unitPref: r.unit_pref === 'lb' ? 'lb' : 'kg',
+              weekStart: r.week_start,
+              defaultRestSeconds: r.default_rest_seconds,
+              trainingGoal: r.training_goal,
+            },
+      };
+    },
+    async markOnboardingComplete(userId, nowMs) {
+      // set-once; never enqueues an outbox op (local-only marker, m0002)
+      await db.runAsync(
+        `UPDATE profiles SET onboarding_completed_at = COALESCE(onboarding_completed_at, ?) WHERE id = ?`,
+        [nowMs, userId],
       );
     },
   };
@@ -356,10 +399,12 @@ function derivedRepo({ db }: Deps): DerivedRepository {
 
 // ---------------------------------------------------------------- helpers
 function stripLocalMeta<T extends Partial<SyncMeta>>(row: T): Record<string, unknown> {
-  const { synced_version, dirty, local_updated_at, ...rest } = row as Record<string, unknown>;
+  const { synced_version, dirty, local_updated_at, onboarding_completed_at, ...rest } =
+    row as Record<string, unknown>;
   void synced_version;
   void dirty;
   void local_updated_at;
+  void onboarding_completed_at; // local-only marker (m0002) — never synced
   return rest;
 }
 

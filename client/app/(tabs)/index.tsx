@@ -59,7 +59,18 @@ export default function TodayScreen() {
 
   return (
     <Screen>
-      <AppText token="title1">Today</AppText>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <AppText token="title1">Today</AppText>
+        <AppText
+          token="label"
+          color="accent"
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+          onPress={() => router.push('/settings')}
+        >
+          Settings
+        </AppText>
+      </View>
       <View style={{ height: t.spacing.lg }} />
 
       {!loaded ? (

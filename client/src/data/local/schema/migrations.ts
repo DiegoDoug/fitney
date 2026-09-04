@@ -319,5 +319,22 @@ CREATE INDEX sync_conflicts_open_idx ON sync_conflicts (resolved_at, entity);
 `,
 };
 
+/**
+ * m0002 — onboarding gate (SPEC AUTH-03). `onboarding_completed_at` is a
+ * LOCAL-ONLY marker (epoch ms) on the profiles mirror, in the same family as
+ * `dirty` / `synced_version` / `local_updated_at`: it is never part of a
+ * `sync_apply` payload and never pushed. Onboarding still writes the real
+ * profile fields through the normal outbox path; this column only records that
+ * the local device has finished the first-run flow so it is not shown again.
+ * Forward-only, additive, safe on an existing v1 install.
+ */
+const m0002: Migration = {
+  id: 2,
+  name: 'profile_onboarding_marker',
+  up: `
+ALTER TABLE profiles ADD COLUMN onboarding_completed_at INTEGER;
+`,
+};
+
 /** The ordered, forward-only migration chain. Append new migrations; never edit shipped ones. */
-export const MIGRATIONS: readonly Migration[] = [m0001];
+export const MIGRATIONS: readonly Migration[] = [m0001, m0002];
