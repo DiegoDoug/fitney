@@ -20,7 +20,6 @@ import type {
 } from '@/domain/entities';
 import type { DerivedRows, SetFact } from '@/domain/pr';
 import { ActiveSessionExistsError, WritesFrozenError } from '@/domain/errors';
-import type { Uuid } from '@/domain/ids';
 import type {
   DerivedRepository,
   ExerciseRepository,
