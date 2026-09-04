@@ -654,3 +654,75 @@ The human reviewer states CE-R5 v2 is *ready for approval at the proposal level*
 **CE-R6 refinement accepted:** apply the `client-verify.yml` path-filter change first; then build the ruleset PUT body from a **freshly fetched** `gh api repos/DiegoDoug/fitney/rulesets/22205300` (not the snapshot in §14.9.3) so any ruleset edit made in the meantime is preserved — add only the two `required_status_checks` contexts. The §14.9.3 JSON is a reference for *which two entries to add*, not a body to PUT blind.
 
 **State after this pass:** Phase 5 **IN PROGRESS**; phases 9/10/11 **LOCKED**; Foundation exit gate **open**; PR #2 **not merged**. No governance record marks CE-R5 v2 / CE-R6 / CE-R7 as approved. Issue IDs preserved: SEC-OQ-1, SEC-RESID-1, OQ-3, OQ-9/DEP-4, UX-OQ-4, ISS-28, CE-R1, CE-R2.
+
+### 14.13 DEC-53 bounded implementation — 2026-09-04
+
+Human approval **DEC-53** (Notion Decisions DB, Approved, Human, 2026-09-04) authorized bounded implementation of CE-R5 v2, CE-R6, and CE-R7 on PR #2. **Not** Phase 5 acceptance, **not** merge authorization: Phase 5 stays IN PROGRESS, the Foundation exit gate stays OPEN, phases 9/10/11 stay LOCKED, PR #2 is not merged.
+
+#### CE-R5 v2 — implemented (branch `phase-5/auth-isolation`)
+
+| Change | Path |
+|---|---|
+| `decideSignOutDisposition(cause, work, choice?)` — `SignOutCause` = `user_initiated \| session_expired \| account_switch \| account_deleted`, optional `SignOutChoice` = `keep \| discard`. `account_deleted`→drop; involuntary (`session_expired` / `account_switch`)→**always retain + notify** (even a clean expiry — v1 wrongly dropped it); `user_initiated` clean→drop; `+ keep`→retain; `+ discard`→drop; `user_initiated` dirty + no choice→**prompt**. No clock input ⇒ no time-based deletion (FR-SYNC-04). | `src/runtime/account-lifecycle.ts` |
+| Per-container **write freeze**: `assembleContainer` exposes `setWritesFrozen()` / `writesFrozen()`; `createLocalRepositories` takes `isFrozen()` and every outbox-enqueuing method (`profile.upsert`, `session.createActive/setStatus/setRestTimerAnchor`, `performedSet.upsert/remove`) throws `WritesFrozenError` while frozen. Reads, pull-apply (`bulkPut` / `derived.apply`) and the sync engine's own writes are **not** frozen — the "Back up & sign out" final drain still works. | `src/runtime/build-container.ts`, `src/data/local/repositories.ts`, `src/domain/errors.ts` |
+| `context.tsx`: `signOut()` checks `outstandingWork()` **first** — clean → sign out + drop; dirty → **freeze writes, expose `signOutPrompt`, do NOT call the provider sign-out** (so Cancel keeps the session). `resolveSignOutPrompt('backup' \| 'keep' \| 'discard' \| 'cancel')`: `backup` = keep frozen, one final `requestSync('manual')`, **re-check `outbox === 0` AND `openConflicts === 0`** → drop if clean, else stay on the sheet still frozen; `cancel` = unfreeze + stay signed in; `keep` = retain; `discard` = drop (the screen takes a second confirm). `retire(userId, cause, choice)` applies the disposition; the cause defaults to `session_expired` and is reset after every retire, so a genuine refresh-failure `SIGNED_OUT` retains. `confirmAccountDeleted()` seam for the future delete-account flow (drops only after a confirmed deletion). | `src/runtime/context.tsx` |
+| Choice sheet UI (Back up / Keep / Discard + 2nd confirm / Cancel). | `client/app/settings.tsx` |
+| ADR-0009 amended (Notion Architecture Decisions + `docs/architecture/adrs/ADR-0009-*.md`). | — |
+
+**§14.12 acceptance conditions — status:**
+1. *Final-sync failure / Cancel restores writes + scheduling* — ✅ `resolveSignOutPrompt('cancel')` and the "backup still dirty" branch call `setWritesFrozen(false)` / leave it re-enableable; `sign-out-v2.test.ts` "freezes … and restores it exactly on unfreeze".
+2. *Cleanup stays account-scoped* — ✅ `GenerationGuard` + per-`userId` filenames unchanged; a retire only ever touches `activeRef.current`'s own container + that `userId`'s file; `account-isolation.test.ts` covers A→B / A→B→A / late-A-result.
+3. *Password rules gate create/reset only; sign-in still accepts existing credentials* — ✅ already true: `AuthFlow.signIn` → `validateSignInForm` (non-empty check only), no `validatePassword` call. No change needed; noted.
+4. *Effective hosted password policy read directly* — added to §14.9.5 as an increment-3 read-only requirement; hosted inspection attempted below.
+
+**Regression tests (mocked-logic + real-local-SQLite):**
+
+| Requirement (human) | Test |
+|---|---|
+| account-switch isolation | `account-isolation.test.ts` ("A and B never see each other"; A→B→A over a retained file) + `account-lifecycle.test.ts` (`decideAccountAction` `retire-then-activate`; disposition `account_switch` → retain) |
+| cancellation / failure recovery | `sign-out-v2.test.ts` ("freezes the feature write path and restores it exactly on unfreeze" — every enqueue method throws `WritesFrozenError` while frozen, all succeed after unfreeze, nothing lost) |
+| conflict preservation | `sign-out-v2.test.ts` ("counts an unresolved sync_conflicts row, and a retain never removes it" — `outstandingWork().openConflicts` counted; disposition = `prompt`; after dispose + reopen the retained file, the `sync_conflicts` row is still there) |
+| conditions permitting DB deletion | `sign-out-v2.test.ts` ("drop is permitted ONLY for: confirmed deletion, clean user sign-out, explicit discard" / "drop is NEVER permitted for: involuntary end, or a dirty user sign-out without an explicit discard") + `account-lifecycle.test.ts` full matrix + "no time-based deletion path" |
+| final drain works while frozen | `sign-out-v2.test.ts` ("the sync engine still writes while the feature path is frozen") |
+
+**Verification (from `client/`):** full-app `tsc` PASS · logic `tsc` PASS · `depcruise src app` 0 err (1 pre-existing warn) · `jest` **16 suites, 108/108** (10 new for CE-R5 v2). All mocked-logic + real-local-SQLite. **Not established:** the `context.tsx` choice-sheet *orchestration* end-to-end and the `settings.tsx` sheet *rendering/interaction* (no `jest-expo` harness — WORK-007 / increment 3–4); real GoTrue `SIGNED_OUT`-vs-`session_expired` event timing (hosted — L-2c); `expo-sqlite` `deleteDatabaseAsync` after a retain (WORK-010).
+
+#### CE-R6 — applied
+
+- `.github/workflows/client-verify.yml`: `pull_request:` path filter removed (kept on `push: [main]`). Non-weakening.
+- Ruleset **`22205300`** updated from a **freshly fetched** copy (`gh api repos/DiegoDoug/fitney/rulesets/22205300` at apply time == the §14.9.3 snapshot; `updated_at` 2026-09-03T10:37 → 2026-09-03T23:45 CDT after the PUT). `required_status_checks` now: `db-verify`, **`full-app-typecheck`**, **`logic-tests`** (all `integration_id: 15368`). All unrelated settings preserved — verified post-PUT: `enforcement: active`, `bypass_actors: []`, rule types `[deletion, non_fast_forward, creation, required_status_checks, pull_request]`, `strict_required_status_checks_policy: true`, `required_review_thread_resolution: true`.
+- **Non-client-PR verification:** the docs-only commit that carries this §14.13 (touches no `client/**`) must show `full-app-typecheck` + `logic-tests` reporting on its own SHA — see §14.14 for the observed result.
+
+#### CE-R7 — ratified
+
+`react-native@0.81.5` + `react-native-worklets@0.5.1` (SDK-54 `expo install` output; fixes the missing Reanimated-4 peer). **Ratified** per DEC-53. On-device runtime confirmation **remains open under WORK-010** (Reanimated worklet execution, gesture transitions, `expo-sqlite` on the bumped RN). `@supabase/supabase-js` unchanged.
+
+#### Hosted-auth inspection
+
+See §14.14.
+
+#### State
+
+Phase 5 **IN PROGRESS** · phases 9/10/11 **LOCKED** · Foundation exit gate **OPEN** · PR #2 **not merged**. Issue IDs preserved: SEC-OQ-1, SEC-RESID-1, OQ-3, OQ-9/DEP-4, UX-OQ-4, ISS-28, CE-R1, CE-R2.
+
+### 14.14 Hosted-auth inspection + CE-R6 non-client-PR verification — 2026-09-04
+
+#### Effective hosted authentication settings (read-only; ACCESS-BLOCKED)
+
+Attempted via the connected Supabase MCP server:
+
+| Tool | Result |
+|---|---|
+| `list_projects` / `get_project` | `fitney-dev` (ref `oaubwbvoaydveguqjovq`) — **ACTIVE_HEALTHY**, Postgres 17.6.1.166, `us-east-1`. Metadata only; **no auth config**. |
+| `get_advisors(security)` | one **INFO** lint — `public.deletion_receipts` "RLS enabled, no policy". This is the **intentional** `service_role`-only design (SEC-REQ-DATA-02), already accepted. **No auth-related security advisory** (no leaked-password / signup / redirect finding surfaced). |
+| `execute_sql` | GoTrue configuration is not in a queryable table — not readable this way. |
+
+**Access blocker (precise):** the **effective** GoTrue/auth configuration for `fitney-dev` — `password_min_length`, `password_requirements`, `mailer_autoconfirm` (email confirmation), leaked-password (HIBP) protection, `disable_signup`, rate limits, and `uri_allow_list` (redirect URLs) — is served by the Supabase **Management API** `GET /v1/projects/{ref}/config/auth`, which the connected MCP server **does not expose** (its tools: `list_projects`, `get_project`, `get_advisors`, `list_tables`, `execute_sql`, `apply_migration`, `get_project_url`, `get_publishable_keys`, logs, edge functions, branches, docs — none returns auth config). Reading it needs **either** a `SUPABASE_ACCESS_TOKEN` (personal access token) + `curl https://api.supabase.com/v1/projects/oaubwbvoaydveguqjovq/config/auth` **or** the Supabase dashboard — both **human, read-only** steps. Not attempted (no access token available; must not request one).
+
+**What is confirmed:** `supabase/config.toml` (the *intended* config, tracked) sets `minimum_password_length = 8`, `password_requirements = "lower_upper_letters_digits"`, `enable_confirmations = false` (commented "LOCAL ONLY"), `additional_redirect_urls = ["http://localhost:19006"]` (no `fitney://auth/callback`). Whether `supabase config push` has applied this to `fitney-dev` is **not verifiable** via available tooling. The client `validatePassword` was aligned to the `config.toml` policy (§14.9.5); if the live dashboard policy differs, `PASSWORD_POLICY_HINT` + `validatePassword` must be reconciled to it in increment 3 (§14.9.5 item 3).
+
+**Carried to increment 3 (§14.9.5):** a human reads `GET /v1/projects/oaubwbvoaydveguqjovq/config/auth` (or the dashboard), confirms `password_*`, `mailer_autoconfirm`, HIBP, rate limits, and adds `fitney://auth/callback` (+ Expo Go variants) to `uri_allow_list`.
+
+#### CE-R6 — non-client-PR verification
+
+The commit carrying §14.13–14.14 touches **`docs/`, `.github/workflows/`, `.project-memory/`** — **no `client/**` path**. Observed on that commit's SHA: **see the final report / PR #2 check rollup** — after the `client-verify.yml` path-filter removal, `full-app-typecheck` + `logic-tests` are expected to run and report on a non-client commit (previously they would have been skipped, leaving the now-required checks "Expected — waiting" and blocking merge). This is the live confirmation that CE-R6's two parts are consistent.
