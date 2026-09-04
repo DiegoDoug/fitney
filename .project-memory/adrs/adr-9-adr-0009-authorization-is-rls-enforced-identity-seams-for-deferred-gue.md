@@ -5,7 +5,7 @@ title: "ADR-0009 — Authorization is RLS-enforced; identity seams for deferred 
 notion_page_id: "3cfe6070-43bc-81e9-9e22-f88bb0522f35"
 notion_url: "https://app.notion.com/p/ADR-0009-Authorization-is-RLS-enforced-identity-seams-for-deferred-guest-mode-3cfe607043bc81e99e22f88bb0522f35"
 created: "2026-09-02T20:10:00.000Z"
-last_edited: "2026-09-04T04:47:00.000Z"
+last_edited: "2026-09-04T13:20:00.000Z"
 status: "Accepted"
 ---
 
