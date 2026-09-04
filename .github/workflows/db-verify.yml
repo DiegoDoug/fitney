@@ -46,8 +46,14 @@ jobs:
         with:
           version: 2.67.1
 
-      - name: Start local database
-        run: supabase db start
+      # `supabase db start` only boots the bare Postgres container — fine for
+      # the lint/pgTAP steps below (direct DB connection only), but the
+      # ISS-29/WORK-013 hosted-tier jest steps need the REST/Auth gateway too
+      # (they sign in via @supabase/supabase-js against http://127.0.0.1:54321,
+      # exactly like the client app does) — `supabase start` boots the full
+      # local stack (Postgres + GoTrue + PostgREST + Kong) that requires.
+      - name: Start local Supabase stack
+        run: supabase start
 
       - name: Apply migration chain from scratch (+ seed)
         run: supabase db reset --local
