@@ -8,7 +8,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { assembleContainer, type ContainerDeps } from '@/runtime/build-container';
+import { assembleContainer, readOutstanding, type ContainerDeps } from '@/runtime/build-container';
 import {
   decideSignOutDisposition,
   type SignOutCause,
@@ -194,6 +194,35 @@ describe('outstandingWork + conflict preservation', () => {
       c = await assembleContainer(USER, deps(createTestDb(file)));
       expect((await c.outstandingWork()).openConflicts).toBe(1);
       await c.dispose();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('Remove account from this device — data path (CE-R5 v2)', () => {
+  it('reads a retained file’s outstanding count, then a drop makes it gone', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fitney-rm-'));
+    const file = join(dir, `fitney-${USER}.db`);
+    try {
+      const c = await assembleContainer(USER, deps(createTestDb(file)));
+      await logASet(c); // one pending outbox row
+      await c.dispose(); // retain (no drop)
+
+      // retainedAccountOutstanding: open a fresh read-only handle, count, close
+      const probe = createTestDb(file);
+      const outstanding = await readOutstanding(probe);
+      await probe.closeAsync();
+      expect(outstanding.outbox).toBeGreaterThan(0);
+
+      // removeAccountFromDevice: delete the file
+      rmSync(file, { force: true });
+
+      // a subsequent open is a fresh, empty DB (the retained data is gone)
+      const after = await assembleContainer(USER, deps(createTestDb(file)));
+      expect(await after.outstandingWork()).toEqual({ outbox: 0, openConflicts: 0 });
+      expect(await after.repos.session.getActive(USER)).toBeNull();
+      await after.dispose();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

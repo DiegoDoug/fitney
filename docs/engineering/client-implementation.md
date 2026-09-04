@@ -714,7 +714,7 @@ Attempted via the connected Supabase MCP server:
 | Tool | Result |
 |---|---|
 | `list_projects` / `get_project` | `fitney-dev` (ref `oaubwbvoaydveguqjovq`) — **ACTIVE_HEALTHY**, Postgres 17.6.1.166, `us-east-1`. Metadata only; **no auth config**. |
-| `get_advisors(security)` | one **INFO** lint — `public.deletion_receipts` "RLS enabled, no policy". This is the **intentional** `service_role`-only design (SEC-REQ-DATA-02), already accepted. **No auth-related security advisory** (no leaked-password / signup / redirect finding surfaced). |
+| `get_advisors(security)` | one **INFO** lint — `public.deletion_receipts` "RLS enabled, no policy" — the **intentional** `service_role`-only design (SEC-REQ-DATA-02), already accepted. **An empty auth-advisory list is NOT verification of the auth policy**: the advisor does not report `password_requirements`, email-confirmation state, HIBP, or the redirect allow-list. The effective settings are still **not inspected**. |
 | `execute_sql` | GoTrue configuration is not in a queryable table — not readable this way. |
 
 **Access blocker (precise):** the **effective** GoTrue/auth configuration for `fitney-dev` — `password_min_length`, `password_requirements`, `mailer_autoconfirm` (email confirmation), leaked-password (HIBP) protection, `disable_signup`, rate limits, and `uri_allow_list` (redirect URLs) — is served by the Supabase **Management API** `GET /v1/projects/{ref}/config/auth`, which the connected MCP server **does not expose** (its tools: `list_projects`, `get_project`, `get_advisors`, `list_tables`, `execute_sql`, `apply_migration`, `get_project_url`, `get_publishable_keys`, logs, edge functions, branches, docs — none returns auth config). Reading it needs **either** a `SUPABASE_ACCESS_TOKEN` (personal access token) + `curl https://api.supabase.com/v1/projects/oaubwbvoaydveguqjovq/config/auth` **or** the Supabase dashboard — both **human, read-only** steps. Not attempted (no access token available; must not request one).
@@ -735,3 +735,43 @@ Commit **`e0fec10`** (ADR-0009 amendment + §14.13–14.14 + roadmap + mirror) t
 | `mergeStateStatus` | `CLEAN` |
 
 CE-R6's two parts are consistent: `client-verify.yml` (no `pull_request` path filter) runs `full-app-typecheck` + `logic-tests` on **every** PR commit, and ruleset `22205300` now **requires** all three. A non-client PR receives — and is gated by — the client checks.
+
+### 14.15 CE-R5 v2 correction pass — 2026-09-04 (under DEC-53)
+
+Human review of §14.13 flagged: (a) the freeze must not start when the choice sheet opens; (b) a failed/incomplete backup and Cancel must restore writes **and** scheduling for the still-active account; (c) the barrier must persist across a **successful** final verification and teardown; (d) the orchestration itself — not just the repo freeze setters — must be tested; (e) "Remove account from this device" was authorized in the CE-R5 v2 scope but not implemented; (f) an empty auth-advisory list is not a hosted verification.
+
+#### Corrections applied
+
+| # | Correction | Change |
+|---|---|---|
+| a | **Opening the sheet no longer freezes.** `begin()` freezes **momentarily** only to read `outstandingWork()` race-free, then unfreezes **before** it prompts. The backup freeze starts only in `resolve('backup')`. | `src/runtime/sign-out-controller.ts` (`begin()` dirty path calls `setWritesFrozen(false)` before `setPrompt(work)`) |
+| b | **Failed / incomplete backup + Cancel restore writes + scheduling.** `resolve('backup')` residual branch calls `setWritesFrozen(false)` then re-prompts; `resolve('cancel')` calls `setWritesFrozen(false)` + clears the prompt + keeps the session. Unfreezing re-enables the outbox-enqueuing methods, which re-enables the local-change sync trigger — there is no separate scheduler state to restore (`SyncEngine` holds no timers). | `sign-out-controller.ts` |
+| c | **Barrier held through teardown on the clean paths.** `begin()` clean and `resolve('backup')`-clean call `signOutWith(...)` **without** unfreezing — the container stays frozen through the provider sign-out and `retire`/`dispose`, so no write can land between the final verification and the DB drop. Asserted by the fake host recording `writesFrozen() === true` at the `signOutWith` call. | `sign-out-controller.ts` |
+| d | **Production orchestration extracted + tested.** `SignOutController` is the state machine `context.tsx` now delegates `signOut()` / `resolveSignOutPrompt()` to (via a thin `SignOutHost`). A monotonic `attempt` counter + the host `generation()` make a superseded in-flight attempt (Cancel mid-backup, account switch, signed-out-elsewhere) return `'stale'` and **never** sign out, drop a DB, or clear credentials. | `src/runtime/sign-out-controller.ts`, `context.tsx` (delegation + `flowRef`), `src/runtime/__tests__/sign-out-controller.test.ts` (10 tests) |
+| e | **"Remove account from this device" implemented.** `retainedAccount` state (set on a retain, cleared on re-auth of that user or on removal; exposed only when it is not the active account). `retainedAccountOutstanding(userId)` → `container.ts:outstandingForUser` opens the retained file read-only, counts, closes (returns `null` if unreadable, never leaves a stray file). `removeAccountFromDevice(userId)` **refuses the active account** and otherwise drops that file. `settings.tsx` shows a "Retained on this device" card → an **explicit loss confirmation** naming the count ("…including N unsynced changes? This can't be undone.") → drop. | `src/runtime/context.tsx`, `src/runtime/container.ts`, `src/runtime/build-container.ts` (`readOutstanding` extracted), `client/app/settings.tsx` |
+| f | §14.14 wording tightened — an empty `get_advisors` list is explicitly **not** verification; effective hosted auth settings remain **not inspected**. | §14.14 |
+
+#### Orchestration test coverage (`sign-out-controller.test.ts`, 10 tests — real `assembleContainer` + `FakeGateway`)
+
+| Human-requested scenario | Test |
+|---|---|
+| Sync rejection + residual outbox/conflicts | "backup that cannot drain → RESTORES writes and re-prompts with the residual" (`RejectingGateway` — every `apply` throws `TransportError`; `resolve('backup')` → `'reprompt'`, prompt shows residual, `writesFrozen()===false`, `signOutWith` never called, a `sets.addSet` succeeds after) |
+| Cancel and retry | "cancel → unfreezes, clears the prompt, keeps the session; a retry then works" (`begin` → `backup` reprompt → `cancel` → `begin` again → `keep` → retained, not dropped) |
+| Delayed backup completion after cancellation | "a delayed backup completing AFTER Cancel is inert" (slow `apply`; `resolve('backup')` in flight; `resolve('cancel')` supersedes; awaited backup → `'stale'`, no `signOutWith`, no drop, writes restored) |
+| Delayed backup completion after account switching | "a delayed backup completing AFTER an account switch cannot touch either account" (mid-backup `state.gen`↑ + container swap → `'stale'`; account B's `outstandingWork` unchanged) |
+| Clean sign-out with a concurrent local write | "clean → signs out with the write barrier still held through teardown" + "a write attempted DURING the momentary check window is rejected" (the check runs frozen; a write that lands *before* `begin()` makes it `'prompt'`, not a silent drop) |
+| Explicit discard | "discard → drops after the choice" |
+| Clean backup | "backup that DOES drain cleanly → signs out with the barrier still held" |
+| Repo freeze barrier (regression for the setters) | "every outbox-enqueuing method throws `WritesFrozenError` while frozen; reads and pull-apply do not" |
+
+"Remove account" data path: `sign-out-v2.test.ts` "reads a retained file's outstanding count, then a drop makes it gone".
+
+#### Verification (from `client/`)
+
+full-app `tsc` PASS · logic `tsc` PASS · `depcruise src app` 0 err (1 pre-existing warn) · `jest` **17 suites / 119 tests** (11 new). Mocked-logic + real-local-SQLite only.
+
+**Still device/hosted-unverified:** the `context.tsx` ↔ `settings.tsx` wiring and the sheet's rendering/interaction (no `jest-expo` harness — WORK-007); real GoTrue `SIGNED_OUT`-vs-`session_expired` timing (L-2c); `expo-sqlite` `deleteDatabaseAsync` after a retain and `outstandingForUser`'s open/close on a real retained file (WORK-010); the retained-account "Remove" card end-to-end.
+
+#### State
+
+Phase 5 **IN PROGRESS** · phases 9/10/11 **LOCKED** · Foundation exit gate **OPEN** · PR #2 **not merged**. Issue IDs preserved: SEC-OQ-1, SEC-RESID-1, OQ-3, OQ-9/DEP-4, UX-OQ-4, ISS-28, CE-R1, CE-R2.

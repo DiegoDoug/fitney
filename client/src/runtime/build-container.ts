@@ -51,6 +51,18 @@ export type AppContainer = {
   dispose(): Promise<void>;
 };
 
+/** Count local work not yet acknowledged by the server, for any open DB handle
+ *  (used both for the active container and for a retained, re-opened file). */
+export async function readOutstanding(
+  db: Pick<SqlDatabase, 'getFirstAsync'>,
+): Promise<{ outbox: number; openConflicts: number }> {
+  const obx = await db.getFirstAsync<{ n: number }>(`SELECT COUNT(*) AS n FROM sync_outbox`);
+  const cf = await db.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM sync_conflicts WHERE resolved_at IS NULL`,
+  );
+  return { outbox: obx?.n ?? 0, openConflicts: cf?.n ?? 0 };
+}
+
 export type ContainerDeps = {
   db: SqlDatabase;
   gateway: SyncGatewayPort;
@@ -112,11 +124,7 @@ export async function assembleContainer(userId: string, d: ContainerDeps): Promi
     exerciseSearch,
     onboarding,
     async outstandingWork() {
-      const obx = await d.db.getFirstAsync<{ n: number }>(`SELECT COUNT(*) AS n FROM sync_outbox`);
-      const cf = await d.db.getFirstAsync<{ n: number }>(
-        `SELECT COUNT(*) AS n FROM sync_conflicts WHERE resolved_at IS NULL`,
-      );
-      return { outbox: obx?.n ?? 0, openConflicts: cf?.n ?? 0 };
+      return readOutstanding(d.db);
     },
     setWritesFrozen(frozen: boolean) {
       writesFrozen = frozen;

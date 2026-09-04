@@ -25,7 +25,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { buildContainer as nativeBuildContainer, createAuthPort, deleteUserDatabase } from './container';
+import {
+  buildContainer as nativeBuildContainer,
+  createAuthPort,
+  deleteUserDatabase,
+  outstandingForUser as nativeOutstandingForUser,
+} from './container';
 import type { AppContainer } from './build-container';
 import {
   decideAccountAction,
@@ -34,6 +39,7 @@ import {
   type SignOutCause,
   type SignOutChoice,
 } from './account-lifecycle';
+import { SignOutController } from './sign-out-controller';
 import { AuthFlow } from '@/features/auth/auth-flow';
 import type { OnboardingInput, OnboardingDraft } from '@/features/onboarding/onboarding-service';
 import { consoleLogger } from '@/services/logger';
@@ -95,6 +101,19 @@ export type AuthContextValue = {
   resolveSignOutPrompt(choice: 'backup' | 'keep' | 'discard' | 'cancel'): Promise<void>;
   /** called by the (future) delete-account flow AFTER a confirmed server deletion */
   confirmAccountDeleted(): Promise<void>;
+  /**
+   * A previous session was retained on this device (involuntary end, or the user
+   * chose "keep on this device"). Non-null only when it is NOT the active account.
+   */
+  retainedAccount: string | null;
+  /** count outstanding work for the retained account (for the removal confirm) */
+  retainedAccountOutstanding(
+    userId: string,
+  ): Promise<{ outbox: number; openConflicts: number } | null>;
+  /** permanently delete a retained account's local DB from this device (explicit,
+   *  informed — the screen takes the loss confirmation first). Refuses to remove
+   *  the active account. */
+  removeAccountFromDevice(userId: string): Promise<void>;
   /** apply an inbound email-confirm / password-recovery deep link */
   handleAuthDeepLink(url: string): Promise<void>;
 
@@ -142,6 +161,9 @@ export type RuntimeProviderProps = {
   authPort?: AuthPort;
   buildContainer?: (userId: string) => Promise<AppContainer>;
   dropDatabase?: (userId: string) => Promise<void>;
+  outstandingForUser?: (
+    userId: string,
+  ) => Promise<{ outbox: number; openConflicts: number } | null>;
 };
 
 export function RuntimeProvider({
@@ -150,12 +172,14 @@ export function RuntimeProvider({
   authPort,
   buildContainer,
   dropDatabase,
+  outstandingForUser,
 }: RuntimeProviderProps) {
   const [phase, setPhase] = useState<InternalPhase>({ kind: 'bootstrapping' });
   const [unsyncedNotice, setUnsyncedNotice] = useState(false);
   const [signOutPrompt, setSignOutPrompt] = useState<{ outbox: number; openConflicts: number } | null>(
     null,
   );
+  const [retainedAccount, setRetainedAccount] = useState<string | null>(null);
 
   // --- stable singletons ---------------------------------------------------
   const guardRef = useRef(new GenerationGuard());
@@ -171,6 +195,7 @@ export function RuntimeProvider({
 
   const buildFn = buildContainer ?? nativeBuildContainer;
   const dropFn = dropDatabase ?? deleteUserDatabase;
+  const outstandingForUserFn = outstandingForUser ?? nativeOutstandingForUser;
 
   const port = useMemo<AuthPort>(() => {
     if (authPort) return authPort;
@@ -182,6 +207,28 @@ export function RuntimeProvider({
   }, [authPort, devUserId]);
 
   const flow = useMemo(() => new AuthFlow(port, { logger: consoleLogger, analytics: noopAnalytics }), [port]);
+  const flowRef = useRef(flow);
+  flowRef.current = flow;
+
+  // Sign-out orchestration (CE-R5 v2). The controller owns the freeze / attempt /
+  // generation discipline; the host below is the thin runtime surface. `run` is a
+  // stable closure over refs, so referencing it here is safe.
+  const signOutRef = useRef<SignOutController | null>(null);
+  if (!signOutRef.current) {
+    signOutRef.current = new SignOutController({
+      container: () => activeRef.current?.container ?? null,
+      generation: () => guardRef.current.current(),
+      setPrompt: (p) => {
+        if (mountedRef.current) setSignOutPrompt(p);
+      },
+      signOutWith: async (cause, choice) => {
+        signOutCauseRef.current = cause;
+        signOutChoiceRef.current = choice;
+        await flowRef.current.signOut().catch(() => {});
+        if (activeRef.current) void run({ type: 'SIGNED_OUT' });
+      },
+    });
+  }
 
   // --- transition primitives --------------------------------------------------
   const safeSetPhase = (p: InternalPhase) => {
@@ -201,6 +248,7 @@ export function RuntimeProvider({
     if (mountedRef.current) setSignOutPrompt(null);
     if (!active) return;
     let notify = false;
+    let retained = false;
     try {
       const work = await active.container.outstandingWork();
       const disp = decideSignOutDisposition(cause, work, choice);
@@ -210,6 +258,7 @@ export function RuntimeProvider({
         consoleLogger.log('info', 'runtime.signout.drop_db', { cause, reason: disp.reason });
       } else {
         // 'retain' — and defensively 'prompt' too: NEVER drop on an unexpected path
+        retained = true;
         notify = disp.action === 'retain' ? disp.notify : true;
         consoleLogger.log('warn', 'runtime.signout.retain_db', { cause, reason: disp.reason });
       }
@@ -219,7 +268,14 @@ export function RuntimeProvider({
       });
     }
     void userId;
-    if (mountedRef.current) setUnsyncedNotice(notify);
+    if (mountedRef.current) {
+      setUnsyncedNotice(notify);
+      // track / clear the retained-file marker for "Remove account from this device"
+      setRetainedAccount((prev) => {
+        if (retained) return active.userId;
+        return prev === active.userId ? null : prev;
+      });
+    }
   };
 
   const activate = async (userId: string, gen: number): Promise<void> => {
@@ -256,6 +312,9 @@ export function RuntimeProvider({
       activeRef.current = null;
       return;
     }
+
+    // re-authentication reactivates a retained file as the active DB (CE-R5 v2)
+    if (mountedRef.current) setRetainedAccount((prev) => (prev === userId ? null : prev));
 
     safeSetPhase(
       needsOnboarding
@@ -359,60 +418,11 @@ export function RuntimeProvider({
       sendPasswordReset: (e) => flow.sendPasswordReset(e),
       resetPassword: (p, c) => flow.resetPassword(p, c),
       signOut: async () => {
-        const active = activeRef.current;
-        if (!active) {
-          await flow.signOut();
-          return;
-        }
-        const work = await active.container.outstandingWork();
-        const disp = decideSignOutDisposition('user_initiated', work);
-        if (disp.action === 'prompt') {
-          // outstanding work — do NOT sign out yet; freeze writes and surface the
-          // choice so Cancel can leave the session intact (CE-R5 v2).
-          active.container.setWritesFrozen(true);
-          if (mountedRef.current) setSignOutPrompt(work);
-          return;
-        }
-        signOutCauseRef.current = 'user_initiated';
-        signOutChoiceRef.current = undefined;
-        await flow.signOut();
-        if (activeRef.current) void run({ type: 'SIGNED_OUT' });
+        await signOutRef.current!.begin();
       },
       signOutPrompt,
       resolveSignOutPrompt: async (choice) => {
-        const active = activeRef.current;
-        if (!active) {
-          if (mountedRef.current) setSignOutPrompt(null);
-          return;
-        }
-        if (choice === 'cancel') {
-          active.container.setWritesFrozen(false);
-          if (mountedRef.current) setSignOutPrompt(null);
-          return;
-        }
-        if (choice === 'backup') {
-          // keep writes frozen; one final drain, then re-check BOTH outbox and conflicts
-          await active.container.sync.requestSync('manual').catch(() => {});
-          const work2 = await active.container.outstandingWork();
-          if (work2.outbox === 0 && work2.openConflicts === 0) {
-            signOutCauseRef.current = 'user_initiated';
-            signOutChoiceRef.current = undefined; // clean → drop
-            if (mountedRef.current) setSignOutPrompt(null);
-            await flow.signOut();
-            if (activeRef.current) void run({ type: 'SIGNED_OUT' });
-          } else {
-            // still not clean — stay on the sheet with the residual count, still frozen
-            if (mountedRef.current) setSignOutPrompt(work2);
-          }
-          return;
-        }
-        // 'keep' | 'discard' — the screen has already taken the second confirm for discard
-        active.container.setWritesFrozen(false);
-        signOutCauseRef.current = 'user_initiated';
-        signOutChoiceRef.current = choice;
-        if (mountedRef.current) setSignOutPrompt(null);
-        await flow.signOut();
-        if (activeRef.current) void run({ type: 'SIGNED_OUT' });
+        await signOutRef.current!.resolve(choice);
       },
       confirmAccountDeleted: async () => {
         if (!activeRef.current) return;
@@ -420,6 +430,19 @@ export function RuntimeProvider({
         signOutChoiceRef.current = undefined;
         await flow.signOut().catch(() => {}); // server graph already gone; local drop is authoritative
         if (activeRef.current) void run({ type: 'SIGNED_OUT' });
+      },
+      retainedAccount:
+        retainedAccount && retainedAccount !== activeRef.current?.userId ? retainedAccount : null,
+      retainedAccountOutstanding: (userId: string) => outstandingForUserFn(userId),
+      removeAccountFromDevice: async (userId: string) => {
+        if (userId === activeRef.current?.userId) {
+          throw new Error('cannot remove the active account from this device — sign out first');
+        }
+        await dropFn(userId);
+        consoleLogger.log('warn', 'runtime.account.removed_from_device', { id8: userId.slice(0, 8) });
+        if (mountedRef.current) {
+          setRetainedAccount((prev) => (prev === userId ? null : prev));
+        }
       },
       handleAuthDeepLink: async (url: string) => {
         try {
@@ -442,7 +465,7 @@ export function RuntimeProvider({
       },
       flow,
     };
-  }, [phase, unsyncedNotice, signOutPrompt, flow]);
+  }, [phase, unsyncedNotice, signOutPrompt, retainedAccount, flow, dropFn, outstandingForUserFn]);
 
   return (
     <RuntimeContext.Provider value={publicState}>

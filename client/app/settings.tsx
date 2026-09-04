@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen, AppText, AppSurface, PrimaryButton, FormBanner } from '@/components/ui';
@@ -6,31 +6,48 @@ import { useTheme } from '@/design-system/theme';
 import { useAuth, useRuntime } from '@/runtime/context';
 
 /**
- * Minimal settings (SPEC §4.2). This increment ships only the account section —
- * sign out. Units / theme / plate increment / export / delete-account arrive in
- * their own increments.
+ * Minimal settings (SPEC §4.2). Account section only this increment.
  *
- * Sign-out (CE-R5 v2 / DEC-53): with nothing outstanding, sign out and drop the
- * per-user DB (ADR-0009). With outstanding local work, sign-out is a destructive
- * action — a choice sheet (Back up / Keep on this device / Discard / Cancel);
- * nothing is discarded without an explicit informed confirm, and there is no
- * time-based deletion of unsynced work (FR-SYNC-04). Cancel restores normal
- * writes and stays signed in.
+ * Sign-out (CE-R5 v2 / DEC-53): nothing outstanding → sign out + drop the
+ * per-user DB (ADR-0009). Outstanding work → a destructive-action sheet
+ * (Back up / Keep on this device / Discard + confirm / Cancel). Opening the
+ * sheet does NOT freeze local writes; only "Back up & sign out" does, and a
+ * failed backup or Cancel restores them. Nothing is discarded without an
+ * explicit informed confirm and there is no time-based deletion (FR-SYNC-04).
+ *
+ * "Remove account from this device" appears for a RETAINED (previously
+ * signed-out / kept) account and permanently deletes its local DB after an
+ * explicit loss confirmation.
  */
 export default function SettingsScreen() {
   const t = useTheme();
   const rt = useRuntime();
-  const { signOut, unsyncedNotice, signOutPrompt, resolveSignOutPrompt } = useAuth();
+  const {
+    signOut,
+    unsyncedNotice,
+    signOutPrompt,
+    resolveSignOutPrompt,
+    retainedAccount,
+    retainedAccountOutstanding,
+    removeAccountFromDevice,
+  } = useAuth();
   const [pending, setPending] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [removeState, setRemoveState] = useState<
+    | { step: 'idle' }
+    | { step: 'confirm'; outstanding: { outbox: number; openConflicts: number } | null }
+  >({ step: 'idle' });
+
+  useEffect(() => {
+    if (!retainedAccount) setRemoveState({ step: 'idle' });
+  }, [retainedAccount]);
 
   const onSignOut = async () => {
     if (pending) return;
     setPending(true);
-    await signOut(); // opens `signOutPrompt` if there is outstanding work
+    await signOut();
     setPending(false);
   };
-
   const resolve = async (choice: 'backup' | 'keep' | 'discard' | 'cancel') => {
     if (pending) return;
     setPending(true);
@@ -40,6 +57,25 @@ export default function SettingsScreen() {
   };
 
   const n = signOutPrompt ? signOutPrompt.outbox + signOutPrompt.openConflicts : 0;
+
+  const openRemoveConfirm = async () => {
+    if (!retainedAccount || pending) return;
+    setPending(true);
+    const outstanding = await retainedAccountOutstanding(retainedAccount).catch(() => null);
+    setPending(false);
+    setRemoveState({ step: 'confirm', outstanding });
+  };
+  const doRemove = async () => {
+    if (!retainedAccount || pending) return;
+    setPending(true);
+    await removeAccountFromDevice(retainedAccount).catch(() => {});
+    setPending(false);
+    setRemoveState({ step: 'idle' });
+  };
+  const removeN =
+    removeState.step === 'confirm' && removeState.outstanding
+      ? removeState.outstanding.outbox + removeState.outstanding.openConflicts
+      : null;
 
   return (
     <Screen>
@@ -80,12 +116,7 @@ export default function SettingsScreen() {
                   disabled={pending}
                   onPress={() => setConfirmDiscard(true)}
                 />
-                <PrimaryButton
-                  label="Cancel"
-                  variant="secondary"
-                  disabled={pending}
-                  onPress={() => resolve('cancel')}
-                />
+                <PrimaryButton label="Cancel" variant="secondary" disabled={pending} onPress={() => resolve('cancel')} />
               </View>
             ) : (
               <View style={{ gap: t.spacing.sm }}>
@@ -93,18 +124,8 @@ export default function SettingsScreen() {
                   variant="error"
                   message={`Permanently delete ${n} unsynced change${n === 1 ? '' : 's'} from this device? This can't be undone.`}
                 />
-                <PrimaryButton
-                  label="Delete & sign out"
-                  variant="destructive"
-                  loading={pending}
-                  onPress={() => resolve('discard')}
-                />
-                <PrimaryButton
-                  label="Back"
-                  variant="secondary"
-                  disabled={pending}
-                  onPress={() => setConfirmDiscard(false)}
-                />
+                <PrimaryButton label="Delete & sign out" variant="destructive" loading={pending} onPress={() => resolve('discard')} />
+                <PrimaryButton label="Back" variant="secondary" disabled={pending} onPress={() => setConfirmDiscard(false)} />
               </View>
             )}
           </AppSurface>
@@ -125,6 +146,42 @@ export default function SettingsScreen() {
             />
           </AppSurface>
         )}
+
+        {retainedAccount ? (
+          <AppSurface role="raised-1" style={{ borderColor: t.colors.borderStrong, borderWidth: 1 }}>
+            <AppText token="caption" color="textMuted">
+              RETAINED ON THIS DEVICE
+            </AppText>
+            <AppText token="body">{`${retainedAccount.slice(0, 8)}… — local data kept`}</AppText>
+            <View style={{ height: t.spacing.md }} />
+            {removeState.step === 'idle' ? (
+              <PrimaryButton
+                label={pending ? 'Checking…' : 'Remove account from this device'}
+                variant="secondary"
+                loading={pending}
+                onPress={openRemoveConfirm}
+              />
+            ) : (
+              <View style={{ gap: t.spacing.sm }}>
+                <FormBanner
+                  variant="error"
+                  message={
+                    removeN != null
+                      ? `Permanently delete this device's local data for that account, including ${removeN} unsynced change${removeN === 1 ? '' : 's'}? This can't be undone.`
+                      : `Permanently delete this device's local data for that account, including any unsynced changes? This can't be undone.`
+                  }
+                />
+                <PrimaryButton label="Delete local data" variant="destructive" loading={pending} onPress={doRemove} />
+                <PrimaryButton
+                  label="Back"
+                  variant="secondary"
+                  disabled={pending}
+                  onPress={() => setRemoveState({ step: 'idle' })}
+                />
+              </View>
+            )}
+          </AppSurface>
+        ) : null}
       </View>
     </Screen>
   );

@@ -12,7 +12,7 @@ import { openDatabase, deleteDatabase } from '@/data/local/driver.native';
 import { createSupabaseGateway } from '@/data/remote/gateway';
 import { createSupabaseAuthPort } from '@/data/remote/auth-gateway';
 import { getSupabase } from '@/data/remote/client';
-import { assembleContainer, type AppContainer } from './build-container';
+import { assembleContainer, readOutstanding, type AppContainer } from './build-container';
 import { systemClock } from '@/services/clock';
 import { createIdGenerator } from '@/services/ids';
 import { consoleLogger } from '@/services/logger';
@@ -74,4 +74,31 @@ export function createAuthPort(): AuthPort {
  */
 export async function deleteUserDatabase(userId: string): Promise<void> {
   await deleteDatabase(userDbName(userId));
+}
+
+/**
+ * Count outstanding local work for a RETAINED (not-open) per-user file — for the
+ * "Remove account from this device" confirmation (CE-R5 v2). Opens read-only,
+ * counts, closes. Returns null if the file cannot be read (treated by the UI as
+ * "unknown — any unsynced changes will be lost"), and never leaves a stray file.
+ */
+export async function outstandingForUser(
+  userId: string,
+): Promise<{ outbox: number; openConflicts: number } | null> {
+  const name = userDbName(userId);
+  let db: Awaited<ReturnType<typeof openDatabase>> | null = null;
+  try {
+    db = await openDatabase(name);
+    return await readOutstanding(db);
+  } catch {
+    return null;
+  } finally {
+    if (db) {
+      try {
+        await db.closeAsync();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 }
