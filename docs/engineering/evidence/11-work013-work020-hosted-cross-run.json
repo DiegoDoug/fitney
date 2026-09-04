@@ -1,5 +1,6 @@
 {
   "_evidence": "WORK-013 sync-protocol conformance + WORK-020 client/server golden-vector cross-run, run against REAL hosted fitney-dev (oaubwbvoaydveguqjovq) via client/scripts/hosted-verify.mjs, using the exact sync_apply RPC contract client/src/data/remote/gateway.ts calls. Synthetic test accounts + all rows created by this run were deleted afterward (see docs/engineering/client-implementation.md §14.16 for the cleanup query and full narrative).",
+  "_refreshedAfterISS29Fix": "Re-run 2026-09-04T20:41Z after applying supabase/migrations/20260904200000_sync_apply_atomic_concurrency_fix.sql (DEC-55/ISS-29) to fitney-dev. All values below UNCHANGED — matchesClientGoldenVectors still true, idempotent still true. The fix only changes concurrency-race behavior (see docs/engineering/evidence/13-iss29-fix-regression.md); it does not alter computed recompute values. Refresh run's synthetic data cleaned up (0 leftover, verified); security advisor unchanged.",
   "startedAt": "2026-09-04T15:44:43.833Z",
   "auth": {
     "signInA": { "ok": true, "error": null },
