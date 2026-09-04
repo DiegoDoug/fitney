@@ -58,6 +58,35 @@ jobs:
       - name: Run pgTAP suites (supabase/tests/01..04)
         run: supabase test db
 
+      # ISS-29 (DEC-55, 2026-09-04): sync_apply's optimistic-concurrency check
+      # was a TOCTOU race under true concurrent writers, only reproducible via
+      # genuinely concurrent requests — a single-threaded pgTAP script can't
+      # exercise this, so it's gated here instead, against the SAME local
+      # Postgres this job already started. "Random repeated runs alone are
+      # insufficient" (DEC-55) — this asserts the exact invariant broken by
+      # the old migration (exactly one applied / one conflict / one version
+      # increment), not just "it passed this time."
+      - name: Set up Node for the ISS-29 concurrency regression + WORK-013 harnesses
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: ISS-29 concurrency regression (ADR-0009 gap) — two-session sync_apply race
+        working-directory: client
+        run: npx jest --config jest.hosted.config.cjs sync-apply-concurrency
+
+      - name: WORK-013 late-transaction-commit reconciliation (session-capable local Postgres harness)
+        working-directory: client
+        run: npx jest --config jest.hosted.config.cjs late-commit-reconciliation
+
+      - name: WORK-013 same-timestamp page boundary at the real PAGE=200 size
+        working-directory: client
+        run: npx jest --config jest.hosted.config.cjs page-boundary-200
+
       - name: Stop database
         if: always()
         run: supabase stop --no-backup
