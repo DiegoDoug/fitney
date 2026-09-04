@@ -2,7 +2,7 @@
 notion_page_id: "3cfe6070-43bc-8046-b281-eb56b92335af"
 notion_url: "https://app.notion.com/p/Fitney-3cfe607043bc8046b281eb56b92335af"
 last_edited: "2026-09-03T15:00:00.000Z"
-generated_at: "2026-09-04T15:54:58.478Z"
+generated_at: "2026-09-04T16:34:53.938Z"
 generator: "notion-project-memory-bridge@0.1.0"
 ---
 
@@ -162,6 +162,7 @@ Generated from the canonical Notion Shared Project Memory workspace. **Do not ed
 
 ## Open Issues
 
+- [ISS-29 — sync_apply optimistic-concurrency check is a TOCTOU race under true concurrent writers -- can silently drop a conflicting edit](./issues/iss-29-sync-apply-optimistic-concurrency-check-is-a-toctou-race-under-true-co.md) — **Open**
 - [ISS-28 — ISS-28: hosted + local + CI are Postgres 17, not the Postgres 15 assumed by BD-DEC-01](./issues/iss-28-iss-28-hosted-local-ci-are-postgres-17-not-the-postgres-15-assumed-by-.md) — **Decision Needed**
 - [ISS-19 — AR-OQ-1–4: Architecture open questions (UUIDv7, Zod vs valibot, recompute form, reactive query layer)](./issues/iss-19-ar-oq-1-4-architecture-open-questions-uuidv7-zod-vs-valibot-recompute-.md) — **Open**
 - [ISS-20 — BD-OQ-3–4: Backend optimisation / retention questions (sync_apply batching; processed_operations pruning)](./issues/iss-20-bd-oq-3-4-backend-optimisation-retention-questions-sync-apply-batching.md) — **Open**

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-04T15:54:58.493Z",
+  "generated_at": "2026-09-04T16:34:53.951Z",
   "project": {
     "id": "3cfe6070-43bc-8046-b281-eb56b92335af",
     "name": "Fitney",
@@ -10,7 +10,7 @@
     "decisions": 54,
     "adrs": 9,
     "requirements": 71,
-    "issues": 28,
+    "issues": 29,
     "tasks": 7,
     "milestones": 16,
     "reviews": 13,

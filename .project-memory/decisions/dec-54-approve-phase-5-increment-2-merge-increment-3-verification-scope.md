@@ -5,7 +5,7 @@ title: "Approve Phase 5 increment-2 merge + increment-3 verification scope"
 notion_page_id: "3d1e6070-43bc-81cf-9db9-ee811d78d530"
 notion_url: "https://app.notion.com/p/Approve-Phase-5-increment-2-merge-increment-3-verification-scope-3d1e607043bc81cf9db9ee811d78d530"
 created: "2026-09-04T15:53:00.000Z"
-last_edited: "2026-09-04T15:53:00.000Z"
+last_edited: "2026-09-04T16:34:00.000Z"
 status: "Approved"
 ---
 
@@ -45,4 +45,4 @@ true
 
 ## GitHub Ref
 
-https://github.com/DiegoDoug/fitney/pull/2
+https://github.com/DiegoDoug/fitney/pull/3
